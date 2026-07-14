@@ -54,6 +54,11 @@ if (env.NODE_ENV !== 'test') {
 // ─── Global Rate Limit ────────────────────────────────────────────────────────
 app.use('/api', apiLimiter);
 
+// ─── Root Route ───────────────────────────────────────────────────────────────
+app.get('/', (req, res) => {
+  res.status(200).send('🚀 Tradenal API Server is running smoothly...');
+});
+
 // ─── Health Check ─────────────────────────────────────────────────────────────
 app.get('/health', (req, res) => {
   res.status(200).json({
