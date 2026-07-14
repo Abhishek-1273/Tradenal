@@ -4,7 +4,7 @@ import { storage } from '../utils/storage';
 // ── Backend URL config ───────────────────────────────────────────────────
 // USE_LOCAL = true  → local backend at LOCAL_IP:LOCAL_PORT
 // USE_LOCAL = false → Render-hosted backend
-const USE_LOCAL = true;
+const USE_LOCAL = false;
 
 const LOCAL_IP = '192.168.1.105';
 const LOCAL_PORT = 5000;
@@ -30,7 +30,7 @@ const processQueue = (error: unknown, token: string | null): void => {
 const createApiClient = (): AxiosInstance => {
   const client = axios.create({
     baseURL: BASE_URL,
-    timeout: 15000,
+    timeout: 60000,
     headers: {
       'Content-Type': 'application/json',
     },
