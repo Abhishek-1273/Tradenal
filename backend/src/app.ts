@@ -19,6 +19,9 @@ import accountRoutes from './modules/accounts/account.routes';
 
 const app: Application = express();
 
+// Trust proxy for reverse proxies (Render, Cloudflare, etc.) to prevent rate limit warnings
+app.set('trust proxy', 1);
+
 // ─── Security Headers ─────────────────────────────────────────────────────────
 app.use(helmet());
 
