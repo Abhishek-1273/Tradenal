@@ -16,9 +16,9 @@ export type TradeSetup =
   | 'liquiditySweepReversal'
   | 'custom';
 export type TradeResult = 'win' | 'loss' | 'breakeven' | 'partialWin';
-export type EmotionBefore = 'confident' | 'fear' | 'greedy' | 'fomo' | 'calm' | 'excited';
-export type EmotionAfter = 'happy' | 'frustrated' | 'angry' | 'satisfied' | 'neutral' | 'regretful';
-export type EmotionDuring = 'calm' | 'anxious' | 'doubtful' | 'tempted_to_close' | 'tempted_to_move_sl' | 'confident_held';
+export type EmotionBefore = 'confident' | 'fear' | 'greedy' | 'fomo' | 'calm' | 'excited' | 'bored' | 'tired' | 'distracted';
+export type EmotionAfter = 'happy' | 'frustrated' | 'angry' | 'satisfied' | 'neutral' | 'regretful' | 'proud' | 'relieved' | 'disappointed';
+export type EmotionDuring = 'calm' | 'anxious' | 'doubtful' | 'tempted_to_close' | 'tempted_to_move_sl' | 'confident_held' | 'tempted_to_add' | 'impatient' | 'panicky';
 export type TradeMistake =
   | 'enteredEarly'
   | 'lateEntry'
@@ -210,15 +210,15 @@ const TradeSchema = new Schema<ITrade>(
 
     emotionBefore: {
       type: String,
-      enum: ['confident', 'fear', 'greedy', 'fomo', 'calm', 'excited'],
+      enum: ['confident', 'fear', 'greedy', 'fomo', 'calm', 'excited', 'bored', 'tired', 'distracted'],
     },
     emotionDuring: {
       type: String,
-      enum: ['calm', 'anxious', 'doubtful', 'tempted_to_close', 'tempted_to_move_sl', 'confident_held'],
+      enum: ['calm', 'anxious', 'doubtful', 'tempted_to_close', 'tempted_to_move_sl', 'confident_held', 'tempted_to_add', 'impatient', 'panicky'],
     },
     emotionAfter: {
       type: String,
-      enum: ['happy', 'frustrated', 'angry', 'satisfied', 'neutral', 'regretful'],
+      enum: ['happy', 'frustrated', 'angry', 'satisfied', 'neutral', 'regretful', 'proud', 'relieved', 'disappointed'],
     },
     confluenceCount: { type: Number, default: 0, min: 0, max: 20 },
     followedPlan: { type: Boolean, default: true },

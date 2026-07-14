@@ -165,6 +165,15 @@ export const EditTradeScreen: React.FC = () => {
 
   const [ep, sl, tp, ex, tt, ls, rp] = watch(['entryPrice','stopLoss','takeProfit','exitPrice','tradeType','lotSize','riskPercent']);
 
+  const onInvalid = (formErrors: any) => {
+    const errorKeys = Object.keys(formErrors);
+    if (errorKeys.length > 0) {
+      const firstField = errorKeys[0];
+      const message = formErrors[firstField]?.message;
+      showToast(`${firstField.toUpperCase()}: ${message}`, 'error');
+    }
+  };
+
   const onSubmit = async (data: TradeFormData) => {
     try {
       await updateTrade({
@@ -231,7 +240,7 @@ export const EditTradeScreen: React.FC = () => {
             <Ionicons name="close" size={20} color={colors.textPrimary} />
           </TouchableOpacity>
           <Text style={[typography.h3, { color: colors.textPrimary }]}>Edit Trade</Text>
-          <TouchableOpacity onPress={handleSubmit(onSubmit)} disabled={isPending} style={[{ backgroundColor: colors.primary, borderRadius: 20, paddingHorizontal: spacing[4], paddingVertical: spacing[2] }]}>
+          <TouchableOpacity onPress={handleSubmit(onSubmit, onInvalid)} disabled={isPending} style={[{ backgroundColor: colors.primary, borderRadius: 20, paddingHorizontal: spacing[4], paddingVertical: spacing[2] }]}>
             <Text style={[typography.label, { color: '#fff' }]}>{isPending ? 'Saving...' : 'Save'}</Text>
           </TouchableOpacity>
         </View>
@@ -415,7 +424,7 @@ export const EditTradeScreen: React.FC = () => {
             </View>
           </View>
 
-          <Button label="Save Changes" onPress={handleSubmit(onSubmit)} loading={isPending} style={{ marginTop: spacing[4] }} />
+          <Button label="Save Changes" onPress={handleSubmit(onSubmit, onInvalid)} loading={isPending} style={{ marginTop: spacing[4] }} />
         </ScrollView>
       </View>
 

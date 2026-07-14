@@ -4,9 +4,9 @@ const TRADE_TYPES = ['buy', 'sell'] as const;
 const SESSIONS = ['london', 'newyork', 'asian', 'overlap'] as const;
 const SETUPS = ['breakout', 'liquiditySweep', 'smc', 'ict', 'supportResistance', 'trendFollowing', 'scalp', 'swing', 'orderBlock', 'fairValueGap', 'liquiditySweepReversal', 'custom'] as const;
 const RESULTS = ['win', 'loss', 'breakeven', 'partialWin'] as const;
-const EMOTIONS_BEFORE = ['confident', 'fear', 'greedy', 'fomo', 'calm', 'excited'] as const;
-const EMOTIONS_DURING = ['calm', 'anxious', 'doubtful', 'tempted_to_close', 'tempted_to_move_sl', 'confident_held'] as const;
-const EMOTIONS_AFTER = ['happy', 'frustrated', 'angry', 'satisfied', 'neutral', 'regretful'] as const;
+const EMOTIONS_BEFORE = ['confident', 'fear', 'greedy', 'fomo', 'calm', 'excited', 'bored', 'tired', 'distracted'] as const;
+const EMOTIONS_DURING = ['calm', 'anxious', 'doubtful', 'tempted_to_close', 'tempted_to_move_sl', 'confident_held', 'tempted_to_add', 'impatient', 'panicky'] as const;
+const EMOTIONS_AFTER = ['happy', 'frustrated', 'angry', 'satisfied', 'neutral', 'regretful', 'proud', 'relieved', 'disappointed'] as const;
 const MISTAKES = ['enteredEarly', 'lateEntry', 'noConfirmation', 'ignoredTrend', 'riskTooHigh', 'poorRR', 'noSL', 'closedEarly', 'heldTooLong', 'modifiedOrderRepeatedly', 'chasedPrice', 'noHigherTFCheck', 'stackedTooManyConfluences', 'custom'] as const;
 
 export const createTradeSchema = z.object({

@@ -118,6 +118,15 @@ export const AddTradeScreen: React.FC = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entryTimeValue]);
 
+  const onInvalid = (formErrors: any) => {
+    const errorKeys = Object.keys(formErrors);
+    if (errorKeys.length > 0) {
+      const firstField = errorKeys[0];
+      const message = formErrors[firstField]?.message;
+      showToast(`${firstField.toUpperCase()}: ${message}`, 'error');
+    }
+  };
+
   const onSubmit = async (data: TradeFormData) => {
     try {
       const trade = await createTrade({
@@ -248,7 +257,7 @@ export const AddTradeScreen: React.FC = () => {
                 </Text>
               )}
             </View>
-            <TouchableOpacity onPress={handleSubmit(onSubmit)} disabled={isPending} style={[styles.saveBtn, { backgroundColor: colors.primary }]}>
+            <TouchableOpacity onPress={handleSubmit(onSubmit, onInvalid)} disabled={isPending} style={[styles.saveBtn, { backgroundColor: colors.primary }]}>
               <Text numberOfLines={1} style={[typography.label, { color: '#fff' }]}>{isPending ? 'Saving...' : 'Save'}</Text>
             </TouchableOpacity>
           </View>
