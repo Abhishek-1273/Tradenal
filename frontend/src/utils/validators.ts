@@ -63,9 +63,9 @@ export const tradeFormSchema = z.object({
   customSetup: z.string().max(100).optional(),
   result: z.enum(['win', 'loss', 'breakeven', 'partialWin']),
 
-  emotionBefore: z.enum(['confident', 'fear', 'greedy', 'fomo', 'calm', 'excited']).optional(),
-  emotionDuring: z.enum(['calm', 'anxious', 'doubtful', 'tempted_to_close', 'tempted_to_move_sl', 'confident_held']).optional(),
-  emotionAfter: z.enum(['happy', 'frustrated', 'angry', 'satisfied', 'neutral', 'regretful']).optional(),
+  emotionBefore: z.enum(['confident', 'fear', 'greedy', 'fomo', 'calm', 'excited', 'bored', 'tired', 'distracted']).optional(),
+  emotionDuring: z.enum(['calm', 'anxious', 'doubtful', 'tempted_to_close', 'tempted_to_move_sl', 'confident_held', 'tempted_to_add', 'impatient', 'panicky']).optional(),
+  emotionAfter: z.enum(['happy', 'frustrated', 'angry', 'satisfied', 'neutral', 'regretful', 'proud', 'relieved', 'disappointed']).optional(),
   confluenceCount: z.number().int().min(0).max(20).default(0),
   followedPlan: z.boolean().default(true),
   overtraded: z.boolean().default(false),
