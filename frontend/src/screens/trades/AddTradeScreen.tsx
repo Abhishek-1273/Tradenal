@@ -14,6 +14,7 @@ import { useCreateTrade } from '../../hooks/useTrades';
 import { useAccountStore } from '../../store/account.store';
 import { tradesApi } from '../../api/trades.api';
 import { Input } from '../../components/common/Input';
+import { LoadingOverlay } from '../../components/common/LoadingOverlay';
 import { SelectableCard } from '../../components/common/SelectableCard';
 import { SelectableChip } from '../../components/common/SelectableChip';
 import { DateField } from '../../components/common/DateField';
@@ -775,6 +776,12 @@ export const AddTradeScreen: React.FC = () => {
         visible={!!selectedImage}
         imageUrl={selectedImage}
         onClose={() => setSelectedImage(null)}
+      />
+
+      <LoadingOverlay
+        visible={isPending || uploadingImages}
+        fullScreen
+        message={uploadingImages ? 'Uploading screenshots...' : 'Saving trade...'}
       />
     </KeyboardAvoidingView>
   );

@@ -433,6 +433,12 @@ export const EditTradeScreen: React.FC = () => {
         imageUrl={selectedImage}
         onClose={() => setSelectedImage(null)}
       />
+
+      <LoadingOverlay
+        visible={isPending}
+        fullScreen
+        message={uploadingImages ? 'Uploading screenshots...' : 'Saving changes...'}
+      />
     </KeyboardAvoidingView>
   );
 };
