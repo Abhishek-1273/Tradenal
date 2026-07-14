@@ -215,6 +215,7 @@ class AuthService {
     if (input.defaultRisk !== undefined) updateData['settings.defaultRisk'] = input.defaultRisk;
     if (input.defaultRR !== undefined) updateData['settings.defaultRR'] = input.defaultRR;
     if (input.timezone !== undefined) updateData['settings.timezone'] = input.timezone;
+    if (input.brokerGmtOffset !== undefined) updateData['settings.brokerGmtOffset'] = input.brokerGmtOffset;
     if (input.notifications) {
       Object.entries(input.notifications).forEach(([key, val]) => {
         updateData[`settings.notifications.${key}`] = val;

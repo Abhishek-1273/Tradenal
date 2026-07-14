@@ -33,6 +33,7 @@ export const createAccountSchema = z.object({
   broker: z.string().max(100).trim().optional(),
   currency: z.string().min(1).max(10).toUpperCase().trim().default('USD'),
   startingBalance: z.number().min(0, 'Starting balance cannot be negative').default(0),
+  brokerGmtOffset: z.number().min(-12).max(14).default(0),
   propFirmRules: propFirmRulesSchema.optional(),
   personalGoals: personalGoalsSchema.optional(),
 });

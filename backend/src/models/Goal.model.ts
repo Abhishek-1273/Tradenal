@@ -56,6 +56,7 @@ const GoalSchema = new Schema<IGoal>(
       type: Number,
       required: [true, 'Max daily loss is required'],
       min: [0.1, 'Max daily loss must be positive'],
+      default: 5,
     },
     targetConsistency: {
       type: Number,

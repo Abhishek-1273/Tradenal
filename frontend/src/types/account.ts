@@ -27,6 +27,7 @@ export interface Account {
   startingBalance: number;
   isDefault: boolean;
   status: AccountStatus;
+  brokerGmtOffset: number;
   propFirmRules?: PropFirmRules;
   personalGoals?: PersonalGoals;
   currentBalance?: number; // Phase 2: auto-derived balance
@@ -40,6 +41,7 @@ export interface CreateAccountPayload {
   broker?: string;
   currency: string;
   startingBalance: number;
+  brokerGmtOffset?: number;
   propFirmRules?: PropFirmRules;
   personalGoals?: PersonalGoals;
 }

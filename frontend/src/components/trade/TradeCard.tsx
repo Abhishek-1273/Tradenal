@@ -27,6 +27,7 @@ interface TradeCardProps {
   onPress: () => void;
   onFavorite?: () => void;
   style?: ViewStyle;
+  hideDate?: boolean;
 }
 
 export const TradeCard: React.FC<TradeCardProps> = ({
@@ -34,6 +35,7 @@ export const TradeCard: React.FC<TradeCardProps> = ({
   onPress,
   onFavorite,
   style,
+  hideDate = false,
 }) => {
   const { colors, typography, radii, spacing } = useTheme();
 
@@ -58,6 +60,14 @@ export const TradeCard: React.FC<TradeCardProps> = ({
         style,
       ]}
     >
+      {/* Background Gradient Glow */}
+      <LinearGradient
+        colors={[resultColor + '0a', 'transparent']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+
       {/* Result accent stripe */}
       <View
         style={[
@@ -116,7 +126,7 @@ export const TradeCard: React.FC<TradeCardProps> = ({
               label={trade.result}
               variant={trade.result as any}
               size="sm"
-              style={{ marginTop: 4 }}
+              style={{ marginTop: 4, alignSelf: 'flex-end' }}
             />
           </View>
         </View>
@@ -140,9 +150,13 @@ export const TradeCard: React.FC<TradeCardProps> = ({
 
         {/* Bottom row */}
         <View style={[styles.bottomRow, { marginTop: spacing[2] }]}>
-          <Text style={[typography.caption, { color: colors.textTertiary }]}>
-            {formatDate(trade.tradeDate, 'DD MMM YYYY')}
-          </Text>
+          {!hideDate ? (
+            <Text style={[typography.caption, { color: colors.textTertiary }]}>
+              {formatDate(trade.tradeDate, 'DD MMM YYYY')}
+            </Text>
+          ) : (
+            <View />
+          )}
 
           <View style={styles.bottomRight}>
             {trade.mistakes.length > 0 && (
@@ -208,7 +222,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   stripe: {
-    width: 4,
+    width: 5,
   },
   content: {
     flex: 1,

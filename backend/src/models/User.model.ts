@@ -7,6 +7,7 @@ export interface IUserSettings {
   defaultRisk: number;
   defaultRR: number;
   timezone: string;
+  brokerGmtOffset: number;
   notifications: {
     dailyReminder: boolean;
     weeklyReview: boolean;
@@ -42,6 +43,7 @@ const UserSettingsSchema = new Schema<IUserSettings>(
     defaultRisk: { type: Number, default: 1, min: 0.1, max: 10 },
     defaultRR: { type: Number, default: 2, min: 0.5, max: 20 },
     timezone: { type: String, default: 'UTC' },
+    brokerGmtOffset: { type: Number, default: 0, min: -12, max: 14 },
     notifications: {
       dailyReminder: { type: Boolean, default: true },
       weeklyReview: { type: Boolean, default: true },

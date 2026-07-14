@@ -22,7 +22,7 @@ export class GoalRepository extends BaseRepository<IGoal> {
     return Goal.findOneAndUpdate(
       { userId, accountId, month },
       { ...data, userId, accountId, month },
-      { new: true, upsert: true, runValidators: true }
+      { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
     ).exec() as Promise<IGoal>;
   }
 }

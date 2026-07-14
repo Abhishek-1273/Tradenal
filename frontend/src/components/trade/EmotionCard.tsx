@@ -11,6 +11,29 @@ interface EmotionCardProps {
   style?: ViewStyle;
 }
 
+const getEmotionColors = (label: string, colors: any) => {
+  const successLabels = ['Calm', 'Confident', 'Confident & Held', 'Satisfied', 'Proud', 'Happy'];
+  const warningLabels = ['Excited', 'Doubtful', 'Tempted Add', 'Impatient', 'Neutral', 'Relieved', 'Greedy'];
+  
+  const cleanLabel = label.trim();
+  if (successLabels.includes(cleanLabel)) {
+    return {
+      bg: colors.success + '15',
+      border: colors.success,
+    };
+  }
+  if (warningLabels.includes(cleanLabel)) {
+    return {
+      bg: colors.warning + '15',
+      border: colors.warning,
+    };
+  }
+  return {
+    bg: colors.error + '15',
+    border: colors.error,
+  };
+};
+
 export const EmotionCard: React.FC<EmotionCardProps> = ({ label, icon, selected, onPress, style }) => {
   const { colors, typography, radii, spacing } = useTheme();
   const scale = useRef(new Animated.Value(1)).current;
@@ -23,6 +46,12 @@ export const EmotionCard: React.FC<EmotionCardProps> = ({ label, icon, selected,
     onPress();
   };
 
+  const emotionColors = getEmotionColors(label, colors);
+  const activeBg = selected ? emotionColors.bg : colors.surfaceElevated;
+  const activeBorder = selected ? emotionColors.border : colors.border;
+  const activeColor = selected ? emotionColors.border : colors.textTertiary;
+  const activeTextColor = selected ? emotionColors.border : colors.textSecondary;
+
   return (
     <TouchableOpacity onPress={handlePress} activeOpacity={0.85} style={style}>
       <Animated.View
@@ -30,18 +59,18 @@ export const EmotionCard: React.FC<EmotionCardProps> = ({ label, icon, selected,
           styles.card,
           {
             transform: [{ scale }],
-            backgroundColor: selected ? colors.primarySubtle : colors.surfaceElevated,
-            borderColor: selected ? colors.primary : colors.border,
+            backgroundColor: activeBg,
+            borderColor: activeBorder,
             borderWidth: selected ? 1.5 : 1,
             borderRadius: radii.lg,
             paddingVertical: spacing[3],
           },
         ]}
       >
-        <Ionicons name={icon} size={21} color={selected ? colors.primary : colors.textTertiary} />
+        <Ionicons name={icon} size={21} color={activeColor} />
         <Text
           numberOfLines={1}
-          style={[typography.labelSm, { color: selected ? colors.primary : colors.textSecondary, marginTop: 6 }]}
+          style={[typography.labelSm, { color: activeTextColor, marginTop: 6 }]}
         >
           {label}
         </Text>

@@ -11,10 +11,14 @@ export type TradeSetup =
   | 'trendFollowing'
   | 'scalp'
   | 'swing'
+  | 'orderBlock'
+  | 'fairValueGap'
+  | 'liquiditySweepReversal'
   | 'custom';
 export type TradeResult = 'win' | 'loss' | 'breakeven' | 'partialWin';
 export type EmotionBefore = 'confident' | 'fear' | 'greedy' | 'fomo' | 'calm' | 'excited';
-export type EmotionAfter = 'happy' | 'frustrated' | 'angry' | 'satisfied' | 'neutral';
+export type EmotionAfter = 'happy' | 'frustrated' | 'angry' | 'satisfied' | 'neutral' | 'regretful';
+export type EmotionDuring = 'calm' | 'anxious' | 'doubtful' | 'tempted_to_close' | 'tempted_to_move_sl' | 'confident_held';
 export type TradeMistake =
   | 'enteredEarly'
   | 'lateEntry'
@@ -25,6 +29,10 @@ export type TradeMistake =
   | 'noSL'
   | 'closedEarly'
   | 'heldTooLong'
+  | 'modifiedOrderRepeatedly'
+  | 'chasedPrice'
+  | 'noHigherTFCheck'
+  | 'stackedTooManyConfluences'
   | 'custom';
 
 export interface IScreenshot {
@@ -68,13 +76,20 @@ export interface ITrade extends Document {
 
   // Psychology
   emotionBefore?: EmotionBefore;
+  emotionDuring?: EmotionDuring;
   emotionAfter?: EmotionAfter;
+  confluenceCount?: number;
   followedPlan: boolean;
   overtraded: boolean;
   movedSL: boolean;
   movedTP: boolean;
   revengeTrade: boolean;
   newsTrade: boolean;
+  checkedHigherTimeframe: boolean;
+  waitedForConfirmation: boolean;
+  sizedCorrectly: boolean;
+  withinDailyLossLimit: boolean;
+  singleTradeDominance: boolean;
   mistakes: TradeMistake[];
   customMistake?: string;
 
@@ -181,7 +196,7 @@ const TradeSchema = new Schema<ITrade>(
     },
     setup: {
       type: String,
-      enum: ['breakout', 'liquiditySweep', 'smc', 'ict', 'supportResistance', 'trendFollowing', 'scalp', 'swing', 'custom'],
+      enum: ['breakout', 'liquiditySweep', 'smc', 'ict', 'supportResistance', 'trendFollowing', 'scalp', 'swing', 'orderBlock', 'fairValueGap', 'liquiditySweepReversal', 'custom'],
       index: true,
     },
     customSetup: { type: String, maxlength: 100 },
@@ -197,19 +212,29 @@ const TradeSchema = new Schema<ITrade>(
       type: String,
       enum: ['confident', 'fear', 'greedy', 'fomo', 'calm', 'excited'],
     },
+    emotionDuring: {
+      type: String,
+      enum: ['calm', 'anxious', 'doubtful', 'tempted_to_close', 'tempted_to_move_sl', 'confident_held'],
+    },
     emotionAfter: {
       type: String,
-      enum: ['happy', 'frustrated', 'angry', 'satisfied', 'neutral'],
+      enum: ['happy', 'frustrated', 'angry', 'satisfied', 'neutral', 'regretful'],
     },
+    confluenceCount: { type: Number, default: 0, min: 0, max: 20 },
     followedPlan: { type: Boolean, default: true },
     overtraded: { type: Boolean, default: false },
     movedSL: { type: Boolean, default: false },
     movedTP: { type: Boolean, default: false },
     revengeTrade: { type: Boolean, default: false },
     newsTrade: { type: Boolean, default: false },
+    checkedHigherTimeframe: { type: Boolean, default: false },
+    waitedForConfirmation: { type: Boolean, default: false },
+    sizedCorrectly: { type: Boolean, default: true },
+    withinDailyLossLimit: { type: Boolean, default: true },
+    singleTradeDominance: { type: Boolean, default: true },
     mistakes: {
       type: [String],
-      enum: ['enteredEarly', 'lateEntry', 'noConfirmation', 'ignoredTrend', 'riskTooHigh', 'poorRR', 'noSL', 'closedEarly', 'heldTooLong', 'custom'],
+      enum: ['enteredEarly', 'lateEntry', 'noConfirmation', 'ignoredTrend', 'riskTooHigh', 'poorRR', 'noSL', 'closedEarly', 'heldTooLong', 'modifiedOrderRepeatedly', 'chasedPrice', 'noHigherTFCheck', 'stackedTooManyConfluences', 'custom'],
       default: [],
     },
     customMistake: { type: String, maxlength: 200 },

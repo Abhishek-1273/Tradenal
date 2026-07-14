@@ -1,10 +1,11 @@
-import { apiClient } from './client';
+import { apiClient, BASE_URL } from './client';
 import {
   Trade,
   CreateTradePayload,
   TradeFilters,
   ApiResponse,
 } from '../types';
+import { storage } from '../utils/storage';
 
 export const tradesApi = {
   getTrades: async (
@@ -48,17 +49,30 @@ export const tradesApi = {
       formData.append('screenshots', {
         uri: file.uri,
         name: file.name,
-        type: file.type,
+        type: file.type || 'image/jpeg',
       } as any);
       formData.append('types', types[i] || 'before');
     });
 
-    const res = await apiClient.post<ApiResponse<Trade>>(
-      `/trades/${tradeId}/screenshots`,
-      formData,
-      { headers: { 'Content-Type': 'multipart/form-data' } }
-    );
-    return res.data.data!;
+    const token = await storage.getAccessToken();
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${BASE_URL}/trades/${tradeId}/screenshots`, {
+      method: 'POST',
+      body: formData,
+      headers: headers,
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(errText || 'Failed to upload screenshots');
+    }
+
+    const resJson = await response.json();
+    return resJson.data;
   },
 
   deleteScreenshot: async (tradeId: string, publicId: string): Promise<Trade> => {

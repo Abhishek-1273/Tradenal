@@ -1,10 +1,17 @@
 import axios, { AxiosInstance, AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios';
 import { storage } from '../utils/storage';
 
-// Change to your backend URL
-const BASE_URL = __DEV__
-  ? 'http://192.168.1.100:5000/api'
-  : 'https://your-production-api.com/api';
+// ── Backend URL config ───────────────────────────────────────────────────
+// USE_LOCAL = true  → local backend at LOCAL_IP:LOCAL_PORT
+// USE_LOCAL = false → Render-hosted backend
+const USE_LOCAL = true;
+
+const LOCAL_IP = '192.168.1.105';
+const LOCAL_PORT = 5000;
+
+export const BASE_URL = USE_LOCAL
+  ? `http://${LOCAL_IP}:${LOCAL_PORT}/api`
+  : 'https://tradenal.onrender.com/api';
 
 let isRefreshing = false;
 let failedQueue: Array<{
@@ -49,7 +56,6 @@ const createApiClient = (): AxiosInstance => {
 
       if (error.response?.status === 401 && !originalRequest._retry) {
         if (isRefreshing) {
-          // Queue the request until refresh completes
           return new Promise((resolve, reject) => {
             failedQueue.push({ resolve, reject });
           })
@@ -84,7 +90,6 @@ const createApiClient = (): AxiosInstance => {
           return client(originalRequest);
         } catch (refreshError) {
           processQueue(refreshError, null);
-          // Clear storage and let the auth store handle logout
           await storage.clearAll();
           return Promise.reject(refreshError);
         } finally {
@@ -105,8 +110,6 @@ export const apiClient = createApiClient();
 export const getErrorMessage = (error: unknown): string => {
   if (axios.isAxiosError(error)) {
     const data = error.response?.data;
-    // Prefer specific field-level validation errors over the generic
-    // "Validation failed" message so the user knows exactly what's wrong.
     if (Array.isArray(data?.errors) && data.errors.length > 0) {
       const first = data.errors[0];
       const field = first?.field ? `${first.field}: ` : '';

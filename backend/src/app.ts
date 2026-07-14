@@ -2,6 +2,7 @@ import express, { Application } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import path from 'path';
 
 import { env } from './config/env';
 import { apiLimiter } from './middleware/rateLimit.middleware';
@@ -34,6 +35,9 @@ app.use(
 // ─── Body Parser ──────────────────────────────────────────────────────────────
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// ─── Static files upload directory ───────────────────────────────────────────
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // ─── Request Logging ──────────────────────────────────────────────────────────
 if (env.NODE_ENV !== 'test') {

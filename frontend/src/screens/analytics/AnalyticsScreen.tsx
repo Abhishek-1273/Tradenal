@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Modal, Animated,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Modal, Animated, Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -35,6 +35,37 @@ export const AnalyticsScreen: React.FC = () => {
   const { data: disciplineData, isLoading: disciplineLoading } = useDisciplineScore('all');
   const { activeAccount } = useAccountStore();
   const [selectedPair, setSelectedPair] = useState<any | null>(null);
+  const [selectedInsight, setSelectedInsight] = useState<{
+    label: string;
+    subtitle: string;
+    value: string;
+    color: string;
+    bg: string;
+    icon: string;
+    detail: string;
+  } | null>(null);
+
+  const handleInsightPress = (item: any) => {
+    let detail = '';
+    switch (item.label) {
+      case 'Best Performing Asset':
+        detail = 'This is the currency pair or financial asset that has generated the highest net R-Multiple for your account.';
+        break;
+      case 'Worst Performing Asset':
+        detail = 'This is the currency pair or financial asset that has caused the largest drawdown (highest net loss in R-Multiple) in your account.';
+        break;
+      case 'Most Reliable Setup':
+        detail = 'This is the trading strategy or entry model that has yielded the highest success rate (win rate) among all setups you traded.';
+        break;
+      case 'Optimal Trading Session':
+        detail = 'This is the trading session (Asian, London, or New York) during which your trades have achieved the highest average profitability.';
+        break;
+      case 'Primary Leakage Area':
+        detail = 'This is the most frequent discipline error or mistake you have logged in your journal. Eliminating this error will significantly improve your overall consistency.';
+        break;
+    }
+    setSelectedInsight({ ...item, detail });
+  };
 
   const overviewFadeAnim = useRef(new Animated.Value(0)).current;
   const overviewSlideAnim = useRef(new Animated.Value(15)).current;
@@ -62,6 +93,11 @@ export const AnalyticsScreen: React.FC = () => {
   const revengeTradeAnim = useRef(new Animated.Value(0)).current;
   const overtradingAnim = useRef(new Animated.Value(0)).current;
   const movedSLAnim = useRef(new Animated.Value(0)).current;
+  const checkedHigherTimeframeAnim = useRef(new Animated.Value(0)).current;
+  const waitedForConfirmationAnim = useRef(new Animated.Value(0)).current;
+  const sizedCorrectlyAnim = useRef(new Animated.Value(0)).current;
+  const withinDailyLossLimitAnim = useRef(new Animated.Value(0)).current;
+  const singleTradeDominanceAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (activeTab === 'Psychology') {
@@ -69,6 +105,11 @@ export const AnalyticsScreen: React.FC = () => {
       revengeTradeAnim.setValue(0);
       overtradingAnim.setValue(0);
       movedSLAnim.setValue(0);
+      checkedHigherTimeframeAnim.setValue(0);
+      waitedForConfirmationAnim.setValue(0);
+      sizedCorrectlyAnim.setValue(0);
+      withinDailyLossLimitAnim.setValue(0);
+      singleTradeDominanceAnim.setValue(0);
 
       Animated.stagger(100, [
         Animated.timing(planFollowedAnim, {
@@ -91,6 +132,31 @@ export const AnalyticsScreen: React.FC = () => {
           duration: 600,
           useNativeDriver: false,
         }),
+        Animated.timing(checkedHigherTimeframeAnim, {
+          toValue: disciplineData?.breakdown?.checkedHigherTimeframe ?? 0,
+          duration: 600,
+          useNativeDriver: false,
+        }),
+        Animated.timing(waitedForConfirmationAnim, {
+          toValue: disciplineData?.breakdown?.waitedForConfirmation ?? 0,
+          duration: 600,
+          useNativeDriver: false,
+        }),
+        Animated.timing(sizedCorrectlyAnim, {
+          toValue: disciplineData?.breakdown?.sizedCorrectly ?? 0,
+          duration: 600,
+          useNativeDriver: false,
+        }),
+        Animated.timing(withinDailyLossLimitAnim, {
+          toValue: disciplineData?.breakdown?.withinDailyLossLimit ?? 0,
+          duration: 600,
+          useNativeDriver: false,
+        }),
+        Animated.timing(singleTradeDominanceAnim, {
+          toValue: disciplineData?.breakdown?.singleTradeDominance ?? 0,
+          duration: 600,
+          useNativeDriver: false,
+        }),
       ]).start();
     }
   }, [activeTab, disciplineData]);
@@ -102,6 +168,11 @@ export const AnalyticsScreen: React.FC = () => {
   const dispRevengeAnim = useRef(new Animated.Value(0)).current;
   const dispOvertradeAnim = useRef(new Animated.Value(0)).current;
   const dispMovedSLAnim = useRef(new Animated.Value(0)).current;
+  const dispCheckedHTFAnim = useRef(new Animated.Value(0)).current;
+  const dispWaitedConfAnim = useRef(new Animated.Value(0)).current;
+  const dispSizedCorrectlyAnim = useRef(new Animated.Value(0)).current;
+  const dispWithinLossAnim = useRef(new Animated.Value(0)).current;
+  const dispSingleTradeDominanceAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (activeTab === 'Discipline') {
@@ -110,6 +181,11 @@ export const AnalyticsScreen: React.FC = () => {
       dispRevengeAnim.setValue(0);
       dispOvertradeAnim.setValue(0);
       dispMovedSLAnim.setValue(0);
+      dispCheckedHTFAnim.setValue(0);
+      dispWaitedConfAnim.setValue(0);
+      dispSizedCorrectlyAnim.setValue(0);
+      dispWithinLossAnim.setValue(0);
+      dispSingleTradeDominanceAnim.setValue(0);
 
       const id = scoreAnim.addListener(({ value }) => {
         setDisplayScore(Math.floor(value));
@@ -121,7 +197,7 @@ export const AnalyticsScreen: React.FC = () => {
           duration: 1000,
           useNativeDriver: false,
         }),
-        Animated.stagger(100, [
+        Animated.stagger(80, [
           Animated.timing(dispPlanAnim, {
             toValue: disciplineData?.breakdown?.planFollowed ?? 0,
             duration: 800,
@@ -139,6 +215,31 @@ export const AnalyticsScreen: React.FC = () => {
           }),
           Animated.timing(dispMovedSLAnim, {
             toValue: disciplineData?.breakdown?.noMovedSL ?? 0,
+            duration: 800,
+            useNativeDriver: false,
+          }),
+          Animated.timing(dispCheckedHTFAnim, {
+            toValue: disciplineData?.breakdown?.checkedHigherTimeframe ?? 0,
+            duration: 800,
+            useNativeDriver: false,
+          }),
+          Animated.timing(dispWaitedConfAnim, {
+            toValue: disciplineData?.breakdown?.waitedForConfirmation ?? 0,
+            duration: 800,
+            useNativeDriver: false,
+          }),
+          Animated.timing(dispSizedCorrectlyAnim, {
+            toValue: disciplineData?.breakdown?.sizedCorrectly ?? 0,
+            duration: 800,
+            useNativeDriver: false,
+          }),
+          Animated.timing(dispWithinLossAnim, {
+            toValue: disciplineData?.breakdown?.withinDailyLossLimit ?? 0,
+            duration: 800,
+            useNativeDriver: false,
+          }),
+          Animated.timing(dispSingleTradeDominanceAnim, {
+            toValue: disciplineData?.breakdown?.singleTradeDominance ?? 0,
             duration: 800,
             useNativeDriver: false,
           }),
@@ -462,8 +563,10 @@ export const AnalyticsScreen: React.FC = () => {
                       icon: 'alert-circle-outline',
                     },
                   ].map((item, i, arr) => (
-                    <View
+                    <TouchableOpacity
                       key={item.label}
+                      activeOpacity={0.7}
+                      onPress={() => handleInsightPress(item)}
                       style={{
                         paddingVertical: spacing[3],
                         borderBottomWidth: i < arr.length - 1 ? StyleSheet.hairlineWidth : 0,
@@ -487,11 +590,11 @@ export const AnalyticsScreen: React.FC = () => {
                         </View>
                         <View style={{ flex: 1 }}>
                           <Text style={[typography.label, { color: colors.textPrimary }]}>{item.label}</Text>
-                          <Text style={[typography.caption, { color: colors.textTertiary, marginTop: 2 }]} numberOfLines={1}>{item.subtitle}</Text>
+                          <Text style={[typography.caption, { color: colors.textTertiary, marginTop: 2 }]}>{item.subtitle}</Text>
                         </View>
                       </View>
                       <Text style={[typography.label, { color: item.color, textAlign: 'right', fontWeight: '700' }]}>{item.value}</Text>
-                    </View>
+                    </TouchableOpacity>
                   ))}
                 </Card>
               </Animated.View>
@@ -660,6 +763,11 @@ export const AnalyticsScreen: React.FC = () => {
                        { label: 'No Revenge Trade', rawValue: disciplineData?.breakdown?.noRevengeTrade ?? 0, anim: revengeTradeAnim, icon: 'flame-outline', color: colors.warning },
                        { label: 'No Overtrading', rawValue: disciplineData?.breakdown?.noOvertrading ?? 0, anim: overtradingAnim, icon: 'warning-outline', color: colors.info },
                        { label: 'No Moved SL', rawValue: disciplineData?.breakdown?.noMovedSL ?? 0, anim: movedSLAnim, icon: 'shield-checkmark-outline', color: colors.success },
+                       { label: 'Checked HTF', rawValue: disciplineData?.breakdown?.checkedHigherTimeframe ?? 0, anim: checkedHigherTimeframeAnim, icon: 'telescope-outline', color: colors.primary },
+                       { label: 'Waited Conf.', rawValue: disciplineData?.breakdown?.waitedForConfirmation ?? 0, anim: waitedForConfirmationAnim, icon: 'timer-outline', color: colors.warning },
+                       { label: 'Sized Correctly', rawValue: disciplineData?.breakdown?.sizedCorrectly ?? 0, anim: sizedCorrectlyAnim, icon: 'calculator-outline', color: colors.info },
+                       { label: 'Daily Loss Limit', rawValue: disciplineData?.breakdown?.withinDailyLossLimit ?? 0, anim: withinDailyLossLimitAnim, icon: 'shield-half-outline', color: colors.success },
+                       { label: 'Trade Dominance', rawValue: disciplineData?.breakdown?.singleTradeDominance ?? 0, anim: singleTradeDominanceAnim, icon: 'pie-chart-outline', color: colors.primary },
                      ].map((item) => {
                        const widthPercent = item.anim.interpolate({
                          inputRange: [0, 100],
@@ -678,11 +786,11 @@ export const AnalyticsScreen: React.FC = () => {
                        return (
                          <View key={item.label} style={{ marginBottom: spacing[4] }}>
                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                             <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
                                <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: item.color + '12', alignItems: 'center', justifyContent: 'center', marginRight: 8 }}>
                                  <Ionicons name={item.icon as any} size={14} color={item.color} />
                                </View>
-                               <Text style={[typography.body, { color: colors.textPrimary, fontWeight: '600' }]}>{item.label}</Text>
+                               <Text style={[typography.body, { color: colors.textPrimary, fontWeight: '600', fontSize: 13 }]} numberOfLines={1}>{item.label}</Text>
                              </View>
                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                                <View style={{ paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, backgroundColor: status.color + '12' }}>
@@ -1013,10 +1121,15 @@ export const AnalyticsScreen: React.FC = () => {
                      {disciplineData?.breakdown && (
                        <View style={[{ marginTop: spacing[5], gap: spacing[4] }]}>
                          {[
-                           { label: 'Plan Followed', value: disciplineData.breakdown.planFollowed, anim: dispPlanAnim, icon: 'document-text-outline', weight: '20pts', color: colors.primary },
-                           { label: 'No Revenge Trading', value: disciplineData.breakdown.noRevengeTrade, anim: dispRevengeAnim, icon: 'flame-outline', weight: '20pts', color: colors.warning },
-                           { label: 'No Overtrading', value: disciplineData.breakdown.noOvertrading, anim: dispOvertradeAnim, icon: 'warning-outline', weight: '15pts', color: colors.info },
+                           { label: 'Plan Followed', value: disciplineData.breakdown.planFollowed, anim: dispPlanAnim, icon: 'document-text-outline', weight: '15pts', color: colors.primary },
+                           { label: 'No Revenge Trade', value: disciplineData.breakdown.noRevengeTrade, anim: dispRevengeAnim, icon: 'flame-outline', weight: '15pts', color: colors.warning },
+                           { label: 'No Overtrading', value: disciplineData.breakdown.noOvertrading, anim: dispOvertradeAnim, icon: 'warning-outline', weight: '10pts', color: colors.info },
                            { label: 'SL Respected', value: disciplineData.breakdown.noMovedSL, anim: dispMovedSLAnim, icon: 'shield-checkmark-outline', weight: '5pts', color: colors.success },
+                           { label: 'Checked HTF', value: disciplineData.breakdown.checkedHigherTimeframe, anim: dispCheckedHTFAnim, icon: 'telescope-outline', weight: '2pts', color: colors.primary },
+                           { label: 'Waited Conf.', value: disciplineData.breakdown.waitedForConfirmation, anim: dispWaitedConfAnim, icon: 'timer-outline', weight: '2pts', color: colors.warning },
+                           { label: 'Sized Correctly', value: disciplineData.breakdown.sizedCorrectly, anim: dispSizedCorrectlyAnim, icon: 'calculator-outline', weight: '2pts', color: colors.info },
+                           { label: 'Daily Loss Limit', value: disciplineData.breakdown.withinDailyLossLimit, anim: dispWithinLossAnim, icon: 'shield-half-outline', weight: '2pts', color: colors.success },
+                           { label: 'Trade Dominance', value: disciplineData.breakdown.singleTradeDominance, anim: dispSingleTradeDominanceAnim, icon: 'pie-chart-outline', weight: '2pts', color: colors.primary },
                          ].map((item) => {
                            const barColor = item.value >= 80 ? colors.success : item.value >= 60 ? colors.warning : colors.error;
                            const widthPercent = item.anim.interpolate({
@@ -1027,11 +1140,11 @@ export const AnalyticsScreen: React.FC = () => {
                            return (
                              <View key={item.label}>
                                <View style={[{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }]}>
-                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, marginRight: 8 }}>
                                    <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: item.color + '15', alignItems: 'center', justifyContent: 'center' }}>
                                      <Ionicons name={item.icon as any} size={12} color={item.color} />
                                    </View>
-                                   <Text style={[typography.body, { color: colors.textSecondary }]}>
+                                   <Text style={[typography.body, { color: colors.textSecondary, fontSize: 13 }]} numberOfLines={1}>
                                      {item.label}
                                    </Text>
                                  </View>
@@ -1222,6 +1335,78 @@ export const AnalyticsScreen: React.FC = () => {
           </View>
         </View>
       </Modal>
+
+      {/* Premium Key Insights Bottom Sheet Modal */}
+      <Modal
+        visible={!!selectedInsight}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectedInsight(null)}
+      >
+        <View style={styles.sheetContainer}>
+          {/* Backdrop */}
+          <TouchableOpacity
+            activeOpacity={1}
+            style={styles.sheetBackdrop}
+            onPress={() => setSelectedInsight(null)}
+          />
+          
+          {/* Content */}
+          {selectedInsight && (
+            <View style={[styles.sheetContent, { backgroundColor: colors.background, borderTopLeftRadius: radii.xl, borderTopRightRadius: radii.xl }]}>
+              {/* Grab handle */}
+              <View style={[styles.sheetHandle, { backgroundColor: colors.border }]} />
+              
+              {/* Header */}
+              <View style={styles.sheetHeader}>
+                <View style={[styles.sheetIconWrap, { backgroundColor: selectedInsight.bg }]}>
+                  <Ionicons name={selectedInsight.icon as any} size={24} color={selectedInsight.color} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[typography.h3, { color: colors.textPrimary }]}>{selectedInsight.label}</Text>
+                  <Text style={[typography.caption, { color: colors.textTertiary, marginTop: 2 }]}>
+                    {selectedInsight.subtitle}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setSelectedInsight(null)}
+                  style={[styles.sheetCloseBtn, { backgroundColor: colors.surfaceElevated }]}
+                >
+                  <Ionicons name="close" size={18} color={colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
+              
+              {/* Value Badge Card */}
+              <View style={[styles.valueCard, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
+                <Text style={[typography.caption, { color: colors.textTertiary, textTransform: 'uppercase', letterSpacing: 1 }]}>
+                  Current Insight Value
+                </Text>
+                <Text style={[typography.h1, { color: selectedInsight.color, marginTop: spacing[2], fontWeight: '800' }]}>
+                  {selectedInsight.value}
+                </Text>
+              </View>
+              
+              {/* Detailed Explanation */}
+              <View style={styles.detailSection}>
+                <Text style={[typography.label, { color: colors.textPrimary, marginBottom: spacing[2] }]}>
+                  Why this matters
+                </Text>
+                <Text style={[typography.body, { color: colors.textSecondary, lineHeight: 22 }]}>
+                  {selectedInsight.detail}
+                </Text>
+              </View>
+              
+              {/* Action Button */}
+              <TouchableOpacity
+                onPress={() => setSelectedInsight(null)}
+                style={[styles.sheetActionBtn, { backgroundColor: selectedInsight.color }]}
+              >
+                <Text style={[typography.label, { color: '#fff', fontWeight: '700' }]}>Got it, Thanks!</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -1277,5 +1462,70 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: 'rgba(255,255,255,0.1)',
+  },
+  sheetContainer: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  sheetBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
+  sheetContent: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 40,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  sheetHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+    gap: 12,
+  },
+  sheetIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sheetCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  valueCard: {
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  detailSection: {
+    marginBottom: 28,
+  },
+  sheetActionBtn: {
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
   },
 });

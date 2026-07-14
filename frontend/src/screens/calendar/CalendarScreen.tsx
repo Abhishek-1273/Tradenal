@@ -204,6 +204,7 @@ export const CalendarScreen: React.FC = () => {
             <TradeCard
               key={trade._id}
               trade={trade}
+              hideDate
               onPress={() => navigation.navigate('TradeDetail', { tradeId: trade._id })}
             />
           ))

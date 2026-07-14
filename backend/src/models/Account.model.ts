@@ -29,6 +29,7 @@ export interface IAccount extends Document {
   startingBalance: number;
   isDefault: boolean;
   status: AccountStatus;
+  brokerGmtOffset: number;
   propFirmRules?: IPropFirmRules;
   personalGoals?: IPersonalGoals;
   currentBalance?: number; // Phase 2: auto-derived balance
@@ -107,6 +108,7 @@ const AccountSchema = new Schema<IAccount>(
     },
     propFirmRules: { type: PropFirmRulesSchema },
     personalGoals: { type: PersonalGoalsSchema },
+    brokerGmtOffset: { type: Number, default: 0, min: -12, max: 14 },
   },
   {
     timestamps: true,

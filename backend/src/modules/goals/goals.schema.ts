@@ -6,7 +6,7 @@ export const createGoalSchema = z.object({
   targetRR: z.number().min(0.5, 'Minimum RR target is 0.5'),
   targetWinRate: z.number().min(0).max(100),
   maxDailyTrades: z.number().int().min(1),
-  maxDailyLoss: z.number().positive(),
+  maxDailyLoss: z.number().positive().optional().default(5),
   targetConsistency: z.number().min(0).max(100),
   targetNetRR: z.number().optional(),
   targetTrades: z.number().int().min(1).optional(),

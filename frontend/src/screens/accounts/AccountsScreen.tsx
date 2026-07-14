@@ -17,6 +17,7 @@ import { useTheme } from '../../theme';
 import { ScreenHeader } from '../../components/common/ScreenHeader';
 import { Card } from '../../components/common/Card';
 import { Input } from '../../components/common/Input';
+import { useToast } from '../../components/common/Toast';
 import {
   useAccounts,
   useCreateAccount,
@@ -26,10 +27,39 @@ import {
 } from '../../hooks/useAccounts';
 import { useAccountStore } from '../../store/account.store';
 import { Account, AccountType } from '../../types';
+import { useAuthStore } from '../../store/auth.store';
+
+const formatGmtOffset = (offset: number): string => {
+  if (offset === 0) return '0';
+  const isNegative = offset < 0;
+  const absOffset = Math.abs(offset);
+  const hours = Math.floor(absOffset);
+  const minutes = Math.round((absOffset - hours) * 60);
+  if (minutes === 0) {
+    return `${isNegative ? '-' : '+'}${hours}`;
+  }
+  return `${isNegative ? '-' : '+'}${hours}:${String(minutes).padStart(2, '0')}`;
+};
+
+const parseGmtOffset = (val: string): number => {
+  if (!val) return 0;
+  const cleanVal = val.trim();
+  const isNegative = cleanVal.startsWith('-');
+  const unsignedVal = isNegative ? cleanVal.slice(1) : cleanVal.startsWith('+') ? cleanVal.slice(1) : cleanVal;
+  if (unsignedVal.includes(':')) {
+    const parts = unsignedVal.split(':');
+    const hours = Math.abs(parseInt(parts[0]) || 0);
+    const minutes = Math.abs(parseInt(parts[1]) || 0);
+    const decimal = hours + minutes / 60;
+    return isNegative ? -decimal : decimal;
+  }
+  return parseFloat(cleanVal) || 0;
+};
 
 export const AccountsScreen: React.FC = () => {
   const { colors, typography, spacing, radii } = useTheme();
   const insets = useSafeAreaInsets();
+  const { showToast } = useToast();
 
   const { activeAccount, setActiveAccount } = useAccountStore();
   const { data: accounts = [], isLoading: isFetching } = useAccounts();
@@ -46,6 +76,7 @@ export const AccountsScreen: React.FC = () => {
   const [broker, setBroker] = useState('');
   const [currency, setCurrency] = useState('USD');
   const [startingBalance, setStartingBalance] = useState('');
+  const [brokerGmtOffset, setBrokerGmtOffset] = useState('0');
 
   const updateMutation = useUpdateAccount(editingAccount?._id || '');
 
@@ -56,6 +87,8 @@ export const AccountsScreen: React.FC = () => {
     setBroker('');
     setCurrency('USD');
     setStartingBalance('');
+    const userDefaultOffset = useAuthStore.getState().user?.settings?.brokerGmtOffset ?? 0;
+    setBrokerGmtOffset(formatGmtOffset(userDefaultOffset));
     setFormModalVisible(true);
   };
 
@@ -66,17 +99,18 @@ export const AccountsScreen: React.FC = () => {
     setBroker(account.broker || '');
     setCurrency(account.currency);
     setStartingBalance(String(account.startingBalance));
+    setBrokerGmtOffset(formatGmtOffset(account.brokerGmtOffset ?? 0));
     setFormModalVisible(true);
   };
 
   const handleSave = async () => {
     if (!name.trim()) {
-      Alert.alert('Error', 'Account name is required');
+      showToast('Account name is required', 'error');
       return;
     }
     const balanceNum = parseFloat(startingBalance) || 0;
     if (balanceNum < 0) {
-      Alert.alert('Error', 'Starting balance cannot be negative');
+      showToast('Starting balance cannot be negative', 'error');
       return;
     }
 
@@ -88,6 +122,7 @@ export const AccountsScreen: React.FC = () => {
           broker: broker.trim() || undefined,
           currency,
           startingBalance: balanceNum,
+          brokerGmtOffset: parseGmtOffset(brokerGmtOffset),
         });
       } else {
         await createMutation.mutateAsync({
@@ -96,17 +131,19 @@ export const AccountsScreen: React.FC = () => {
           broker: broker.trim() || undefined,
           currency,
           startingBalance: balanceNum,
+          brokerGmtOffset: parseGmtOffset(brokerGmtOffset),
         });
       }
       setFormModalVisible(false);
+      showToast(editingAccount ? 'Account updated successfully' : 'Account created successfully', 'success');
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Failed to save account');
+      showToast(err?.message || 'Failed to save account', 'error');
     }
   };
 
   const handleDelete = (account: Account) => {
     if (account.isDefault) {
-      Alert.alert('Cannot Delete', 'You cannot delete your default trading account.');
+      showToast('You cannot delete your default trading account.', 'error');
       return;
     }
 
@@ -121,8 +158,9 @@ export const AccountsScreen: React.FC = () => {
           onPress: async () => {
             try {
               await deleteMutation.mutateAsync(account._id);
+              showToast('Account deleted successfully', 'success');
             } catch (err: any) {
-              Alert.alert('Error', err?.message || 'Failed to delete account');
+              showToast(err?.message || 'Failed to delete account', 'error');
             }
           },
         },
@@ -133,8 +171,9 @@ export const AccountsScreen: React.FC = () => {
   const handleSetDefault = async (account: Account) => {
     try {
       await setDefaultMutation.mutateAsync(account._id);
+      showToast(`Default account set to ${account.name}`, 'success');
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Failed to set default account');
+      showToast(err?.message || 'Failed to set default account', 'error');
     }
   };
 
@@ -434,6 +473,14 @@ export const AccountsScreen: React.FC = () => {
               onChangeText={setStartingBalance}
               keyboardType="numeric"
               required
+            />
+
+            <Input
+              label="Broker GMT Offset"
+              placeholder="e.g. 3 (for GMT+3) or -5"
+              value={brokerGmtOffset}
+              onChangeText={setBrokerGmtOffset}
+              keyboardType="numbers-and-punctuation"
             />
 
             <TouchableOpacity

@@ -1,155 +1,159 @@
-import React, { useEffect, useRef, useState, createContext, useContext, useCallback } from 'react';
-import { View, Text, StyleSheet, Animated, TouchableOpacity } from 'react-native';
+import React, { createContext, useContext, useState, useRef } from 'react';
+import { View, Text, StyleSheet, Animated, TouchableOpacity, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../theme';
 
-type ToastType = 'success' | 'error' | 'warning' | 'info';
+type ToastType = 'success' | 'error' | 'info';
 
-interface Toast {
-  id: string;
-  message: string;
-  type: ToastType;
-  duration?: number;
+interface ToastContextType {
+  showToast: (message: string, type?: ToastType) => void;
 }
 
-interface ToastContextValue {
-  showToast: (message: string, type?: ToastType, duration?: number) => void;
-  showSuccess: (message: string) => void;
-  showError: (message: string) => void;
-}
+const ToastContext = createContext<ToastContextType | undefined>(undefined);
 
-const ToastContext = createContext<ToastContextValue>({
-  showToast: () => {},
-  showSuccess: () => {},
-  showError: () => {},
-});
-
-export const useToast = () => useContext(ToastContext);
-
-const ToastItem: React.FC<{ toast: Toast; onDismiss: (id: string) => void }> = ({
-  toast,
-  onDismiss,
-}) => {
-  const { colors, typography, radii, spacing } = useTheme();
-  const insets = useSafeAreaInsets();
-  const slideAnim = useRef(new Animated.Value(-80)).current;
-  const opacityAnim = useRef(new Animated.Value(0)).current;
-
-  const getColors = () => {
-    switch (toast.type) {
-      case 'success': return { bg: colors.successSubtle, border: colors.success, icon: 'checkmark-circle', iconColor: colors.success };
-      case 'error':   return { bg: colors.errorSubtle, border: colors.error, icon: 'alert-circle', iconColor: colors.error };
-      case 'warning': return { bg: colors.warningSubtle, border: colors.warning, icon: 'warning', iconColor: colors.warning };
-      default:        return { bg: colors.infoSubtle, border: colors.info, icon: 'information-circle', iconColor: colors.info };
-    }
-  };
-
-  const { bg, border, icon, iconColor } = getColors();
-
-  useEffect(() => {
-    // Slide in
-    Animated.parallel([
-      Animated.spring(slideAnim, { toValue: 0, speed: 20, bounciness: 6, useNativeDriver: true }),
-      Animated.timing(opacityAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
-    ]).start();
-
-    // Auto dismiss
-    const timer = setTimeout(() => {
-      dismiss();
-    }, toast.duration ?? 3000);
-
-    return () => clearTimeout(timer);
-  }, []);
-
-  const dismiss = () => {
-    Animated.parallel([
-      Animated.timing(slideAnim, { toValue: -80, duration: 200, useNativeDriver: true }),
-      Animated.timing(opacityAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
-    ]).start(() => onDismiss(toast.id));
-  };
-
-  return (
-    <Animated.View
-      style={[
-        styles.toastItem,
-        {
-          backgroundColor: bg,
-          borderColor: border,
-          borderRadius: radii.lg,
-          marginBottom: spacing[2],
-          transform: [{ translateY: slideAnim }],
-          opacity: opacityAnim,
-        },
-      ]}
-    >
-      <Ionicons name={icon as any} size={18} color={iconColor} />
-      <Text
-        style={[
-          typography.body,
-          { color: colors.textPrimary, flex: 1, marginHorizontal: spacing[3] },
-        ]}
-        numberOfLines={2}
-      >
-        {toast.message}
-      </Text>
-      <TouchableOpacity onPress={dismiss} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-        <Ionicons name="close" size={16} color={colors.textTertiary} />
-      </TouchableOpacity>
-    </Animated.View>
-  );
+export const useToast = () => {
+  const context = useContext(ToastContext);
+  if (!context) {
+    throw new Error('useToast must be used within a ToastProvider');
+  }
+  return context;
 };
 
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [toasts, setToasts] = useState<Toast[]>([]);
-  const insets = useSafeAreaInsets();
+  const { colors, typography, spacing, radii, shadows } = useTheme();
+  const [visible, setVisible] = useState(false);
+  const [message, setMessage] = useState('');
+  const [type, setType] = useState<ToastType>('success');
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const showToast = useCallback((message: string, type: ToastType = 'info', duration = 3000) => {
-    const id = Date.now().toString();
-    setToasts((prev) => [...prev.slice(-2), { id, message, type, duration }]); // max 3 at once
-  }, []);
+  const showToast = (msg: string, toastType: ToastType = 'success') => {
+    // Cancel any active timers
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+    }
 
-  const showSuccess = useCallback((message: string) => showToast(message, 'success'), [showToast]);
-  const showError   = useCallback((message: string) => showToast(message, 'error', 4000), [showToast]);
+    setMessage(msg);
+    setType(toastType);
+    setVisible(true);
 
-  const dismiss = useCallback((id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-  }, []);
+    // Animate In
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 350,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 350,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Auto Hide
+    timerRef.current = setTimeout(() => {
+      hideToast();
+    }, 3000);
+  };
+
+  const hideToast = () => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 15,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setVisible(false);
+    });
+  };
+
+  const getToastStyle = () => {
+    switch (type) {
+      case 'success':
+        return {
+          bg: colors.success + '15',
+          border: colors.success + '40',
+          text: colors.textPrimary,
+          icon: 'checkmark-circle',
+          iconColor: colors.success,
+        };
+      case 'error':
+        return {
+          bg: colors.error + '15',
+          border: colors.error + '40',
+          text: colors.textPrimary,
+          icon: 'alert-circle',
+          iconColor: colors.error,
+        };
+      case 'info':
+      default:
+        return {
+          bg: colors.info ? (colors.info + '15') : (colors.primary + '15'),
+          border: colors.info ? (colors.info + '40') : (colors.primary + '40'),
+          text: colors.textPrimary,
+          icon: 'information-circle',
+          iconColor: colors.info || colors.primary,
+        };
+    }
+  };
+
+  const currentStyle = getToastStyle();
 
   return (
-    <ToastContext.Provider value={{ showToast, showSuccess, showError }}>
+    <ToastContext.Provider value={{ showToast }}>
       {children}
-      <View
-        style={[
-          styles.container,
-          { top: insets.top + 60, paddingHorizontal: 16 },
-        ]}
-        pointerEvents="box-none"
-      >
-        {toasts.map((toast) => (
-          <ToastItem key={toast.id} toast={toast} onDismiss={dismiss} />
-        ))}
-      </View>
+      {visible && (
+        <Animated.View
+          style={[
+            styles.toastContainer,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
+              backgroundColor: colors.surface,
+              borderColor: currentStyle.border,
+              borderRadius: radii.full,
+              paddingHorizontal: spacing[4],
+              paddingVertical: spacing[3],
+              ...shadows.md,
+            },
+          ]}
+        >
+          {/* Subtle overlay background for distinct coloring */}
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: currentStyle.bg, borderRadius: radii.full }]} />
+          
+          <View style={styles.toastContent}>
+            <Ionicons name={currentStyle.icon as any} size={20} color={currentStyle.iconColor} style={{ marginRight: spacing[2.5] }} />
+            <Text style={[typography.bodySm, { color: currentStyle.text, fontWeight: '600', flexShrink: 1 }]}>
+              {message}
+            </Text>
+          </View>
+        </Animated.View>
+      )}
     </ToastContext.Provider>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  toastContainer: {
     position: 'absolute',
-    left: 0,
-    right: 0,
+    bottom: 50,
+    alignSelf: 'center',
+    maxWidth: Dimensions.get('window').width * 0.85,
+    borderWidth: 1.5,
+    overflow: 'hidden',
     zIndex: 9999,
   },
-  toastItem: {
+  toastContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 14,
-    borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 8,
+    justifyContent: 'center',
   },
 });

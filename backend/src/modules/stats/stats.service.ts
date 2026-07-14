@@ -70,6 +70,11 @@ class StatsService {
       riskPercent: t.riskPercent,
       emotionBefore: t.emotionBefore ?? 'calm',
       mistakes: t.mistakes,
+      checkedHigherTimeframe: t.checkedHigherTimeframe,
+      waitedForConfirmation: t.waitedForConfirmation,
+      sizedCorrectly: t.sizedCorrectly,
+      withinDailyLossLimit: t.withinDailyLossLimit,
+      singleTradeDominance: t.singleTradeDominance,
     }));
 
     const disciplineScore = calculateDisciplineScore(disciplineInputs);
@@ -227,6 +232,11 @@ class StatsService {
       riskPercent: t.riskPercent,
       emotionBefore: t.emotionBefore ?? 'calm',
       mistakes: t.mistakes,
+      checkedHigherTimeframe: t.checkedHigherTimeframe,
+      waitedForConfirmation: t.waitedForConfirmation,
+      sizedCorrectly: t.sizedCorrectly,
+      withinDailyLossLimit: t.withinDailyLossLimit,
+      singleTradeDominance: t.singleTradeDominance,
     }));
 
     const score = calculateDisciplineScore(disciplineInputs);
@@ -245,6 +255,21 @@ class StatsService {
     const noMovedSLRate = trades.length
       ? (trades.filter((t) => !t.movedSL).length / trades.length) * 100
       : 0;
+    const checkedHTFRate = trades.length
+      ? (trades.filter((t) => t.checkedHigherTimeframe).length / trades.length) * 100
+      : 0;
+    const waitedConfRate = trades.length
+      ? (trades.filter((t) => t.waitedForConfirmation).length / trades.length) * 100
+      : 0;
+    const sizedCorrectlyRate = trades.length
+      ? (trades.filter((t) => t.sizedCorrectly !== false).length / trades.length) * 100
+      : 0;
+    const withinDailyLossRate = trades.length
+      ? (trades.filter((t) => t.withinDailyLossLimit !== false).length / trades.length) * 100
+      : 0;
+    const singleTradeDominanceRate = trades.length
+      ? (trades.filter((t) => t.singleTradeDominance !== false).length / trades.length) * 100
+      : 0;
 
     return {
       score,
@@ -254,6 +279,11 @@ class StatsService {
         noRevengeTrade: Math.round(noRevengeRate),
         noOvertrading: Math.round(noOvertradingRate),
         noMovedSL: Math.round(noMovedSLRate),
+        checkedHigherTimeframe: Math.round(checkedHTFRate),
+        waitedForConfirmation: Math.round(waitedConfRate),
+        sizedCorrectly: Math.round(sizedCorrectlyRate),
+        withinDailyLossLimit: Math.round(withinDailyLossRate),
+        singleTradeDominance: Math.round(singleTradeDominanceRate),
       },
       tradeCount: trades.length,
     };

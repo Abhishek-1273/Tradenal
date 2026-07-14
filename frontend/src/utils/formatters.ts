@@ -169,6 +169,9 @@ export const getSetupLabel = (setup: string): string => {
     trendFollowing: 'Trend Following',
     scalp: 'Scalp',
     swing: 'Swing',
+    orderBlock: 'Order Block',
+    fairValueGap: 'Fair Value Gap',
+    liquiditySweepReversal: 'LS Reversal',
     custom: 'Custom',
   };
   return labels[setup] || setup;
@@ -197,8 +200,33 @@ export const getEmotionEmoji = (emotion: string): string => {
     angry: '😠',
     satisfied: '😊',
     neutral: '😐',
+    regretful: '😔',
   };
   return map[emotion] || '😐';
+};
+
+export const getEmotionDuringEmoji = (emotion: string): string => {
+  const map: Record<string, string> = {
+    calm: '😌',
+    anxious: '😰',
+    doubtful: '🤔',
+    tempted_to_close: '🚪',
+    tempted_to_move_sl: '📉',
+    confident_held: '💪',
+  };
+  return map[emotion] || '😐';
+};
+
+export const getEmotionDuringLabel = (emotion: string): string => {
+  const labels: Record<string, string> = {
+    calm: 'Calm',
+    anxious: 'Anxious',
+    doubtful: 'Doubtful',
+    tempted_to_close: 'Tempted to Close',
+    tempted_to_move_sl: 'Tempted to Move SL',
+    confident_held: 'Confident & Held',
+  };
+  return labels[emotion] || emotion;
 };
 
 export const getMistakeLabel = (mistake: string): string => {
@@ -212,6 +240,10 @@ export const getMistakeLabel = (mistake: string): string => {
     noSL: 'No Stop Loss',
     closedEarly: 'Closed Early',
     heldTooLong: 'Held Too Long',
+    modifiedOrderRepeatedly: 'Modified Order Repeatedly',
+    chasedPrice: 'Chased Price',
+    noHigherTFCheck: 'No HTF Check',
+    stackedTooManyConfluences: 'Too Many Confluences',
     custom: 'Other',
   };
   return labels[mistake] || mistake;

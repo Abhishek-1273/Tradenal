@@ -1,53 +1,65 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  KeyboardAvoidingView, Platform, TextInput, Alert, Animated, LayoutChangeEvent,
+  KeyboardAvoidingView, Platform, TextInput, Alert, Animated, LayoutChangeEvent, Image,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as ImagePicker from 'expo-image-picker';
 import { useTheme } from '../../theme';
 import { useCreateTrade } from '../../hooks/useTrades';
 import { useAccountStore } from '../../store/account.store';
+import { tradesApi } from '../../api/trades.api';
 import { Input } from '../../components/common/Input';
 import { SelectableCard } from '../../components/common/SelectableCard';
 import { SelectableChip } from '../../components/common/SelectableChip';
 import { DateField } from '../../components/common/DateField';
 import { TimeField } from '../../components/common/TimeField';
+import { ImageViewerModal } from '../../components/common/ImageViewerModal';
 import { StepNavigationBar } from '../../components/common/StepNavigationBar';
 import { EmotionCard } from '../../components/trade/EmotionCard';
 import { DisciplineRow } from '../../components/trade/DisciplineRow';
 import { RRCalculator } from '../../components/trade/RRCalculator';
 import { tradeFormSchema, TradeFormData, tradeFormDefaults } from '../../utils/validators';
+import { useToast } from '../../components/common/Toast';
+import { useAuthStore } from '../../store/auth.store';
 import { combineDateAndTime } from '../../utils/formatters';
 import { getErrorMessage } from '../../api/client';
 import {
   COMMON_PAIRS, QUICK_PAIRS, SESSIONS, SETUPS, RESULTS,
-  EMOTIONS_BEFORE, EMOTIONS_AFTER, MISTAKES, DISCIPLINE_ITEMS, SUGGESTED_TAGS,
+  EMOTIONS_BEFORE, EMOTIONS_DURING, EMOTIONS_AFTER, MISTAKES, DISCIPLINE_ITEMS, SUGGESTED_TAGS,
 } from '../../constants';
 
 const SECTIONS = ['Trade Info', 'Prices', 'Psychology', 'Notes'] as const;
 type Section = typeof SECTIONS[number];
 
+type LocalImage = { uri: string; name: string; mimeType: string; screenshotType: 'before' | 'after' | 'markup' };
+
 export const AddTradeScreen: React.FC = () => {
   const { colors, typography, spacing, radii } = useTheme();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const { showToast } = useToast();
   const { mutateAsync: createTrade, isPending } = useCreateTrade();
   const [activeSection, setActiveSection] = useState<Section>('Trade Info');
   const [visited, setVisited] = useState<Set<Section>>(new Set());
   const [tagInput, setTagInput] = useState('');
   const [pairFocused, setPairFocused] = useState(false);
+  const [localImages, setLocalImages] = useState<LocalImage[]>([]);
+  const [uploadingImages, setUploadingImages] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const { activeAccount } = useAccountStore();
 
   const { control, handleSubmit, watch, setValue, formState: { errors } } = useForm<TradeFormData>({
     resolver: zodResolver(tradeFormSchema),
     defaultValues: tradeFormDefaults,
   });
 
-  const [ep, sl, tp, ex, tt, ls, rp, pairValue, reasonValue, notesValue] = watch([
-    'entryPrice', 'stopLoss', 'takeProfit', 'exitPrice', 'tradeType', 'lotSize', 'riskPercent', 'pair', 'reasonForEntry', 'notes',
+  const [ep, sl, tp, ex, tt, ls, rp, pairValue, reasonValue, notesValue, entryTimeValue] = watch([
+    'entryPrice', 'stopLoss', 'takeProfit', 'exitPrice', 'tradeType', 'lotSize', 'riskPercent', 'pair', 'reasonForEntry', 'notes', 'entryTime',
   ]);
 
   // ── Animated tab indicator ──────────────────────────────────────────────
@@ -75,9 +87,40 @@ export const AddTradeScreen: React.FC = () => {
     setActiveSection(s);
   };
 
+  // ── Session auto-calculation ─────────────────────────────────────────────
+  useEffect(() => {
+    if (!entryTimeValue || !activeAccount) return;
+    const [hStr, mStr] = entryTimeValue.split(':');
+    const h = parseInt(hStr, 10);
+    const m = parseInt(mStr, 10);
+    if (isNaN(h) || isNaN(m)) return;
+    const totalMinutes = h * 60 + m;
+    // Convert broker time to GMT
+    const userOffset = useAuthStore.getState().user?.settings?.brokerGmtOffset ?? 0;
+    const gmtOffset = activeAccount.brokerGmtOffset !== undefined && activeAccount.brokerGmtOffset !== 0
+      ? activeAccount.brokerGmtOffset
+      : userOffset;
+    let gmtMinutes = totalMinutes - gmtOffset * 60;
+    if (gmtMinutes < 0) gmtMinutes += 1440;
+    if (gmtMinutes >= 1440) gmtMinutes -= 1440;
+    const gmtH = Math.floor(gmtMinutes / 60);
+    // Session windows in GMT hours
+    const overlapping = gmtH >= 13 && gmtH < 17;
+    const london = gmtH >= 8 && gmtH < 17;
+    const newYork = gmtH >= 13 && gmtH < 22;
+    const asian = gmtH >= 0 && gmtH < 9;
+    let session: 'london' | 'newyork' | 'asian' | 'overlap' = 'london';
+    if (overlapping) session = 'overlap';
+    else if (london) session = 'london';
+    else if (newYork) session = 'newyork';
+    else if (asian) session = 'asian';
+    setValue('session', session);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entryTimeValue]);
+
   const onSubmit = async (data: TradeFormData) => {
     try {
-      await createTrade({
+      const trade = await createTrade({
         pair: data.pair, tradeType: data.tradeType, tradeDate: data.tradeDate,
         entryTime: combineDateAndTime(data.tradeDate, data.entryTime),
         exitTime: combineDateAndTime(data.tradeDate, data.exitTime),
@@ -88,14 +131,94 @@ export const AddTradeScreen: React.FC = () => {
         lotSize: parseFloat(data.lotSize), riskPercent: parseFloat(data.riskPercent),
         pnlAmount: data.pnlAmount ? parseFloat(data.pnlAmount) : undefined,
         session: data.session, setup: data.setup, customSetup: data.customSetup,
-        result: data.result, emotionBefore: data.emotionBefore, emotionAfter: data.emotionAfter,
+        result: data.result, emotionBefore: data.emotionBefore,
+        emotionDuring: data.emotionDuring, emotionAfter: data.emotionAfter,
+        confluenceCount: data.confluenceCount,
         followedPlan: data.followedPlan, overtraded: data.overtraded, movedSL: data.movedSL,
         movedTP: data.movedTP, revengeTrade: data.revengeTrade, newsTrade: data.newsTrade,
+        checkedHigherTimeframe: data.checkedHigherTimeframe,
+        waitedForConfirmation: data.waitedForConfirmation,
+        sizedCorrectly: data.sizedCorrectly,
+        withinDailyLossLimit: data.withinDailyLossLimit,
+        singleTradeDominance: data.singleTradeDominance,
         mistakes: data.mistakes as any[], customMistake: data.customMistake,
         reasonForEntry: data.reasonForEntry, notes: data.notes, tags: data.tags, isFavorite: data.isFavorite,
       });
+
+      // Upload any local images after the trade is created
+      if (localImages.length > 0 && trade?._id) {
+        setUploadingImages(true);
+        try {
+          await tradesApi.uploadScreenshots(
+            trade._id,
+            localImages.map((img) => ({ uri: img.uri, name: img.name, type: img.mimeType })),
+            localImages.map((img) => img.screenshotType)
+          );
+        } catch (uploadErr) {
+          showToast('Trade saved but some screenshots failed to upload.', 'error');
+        } finally {
+          setUploadingImages(false);
+        }
+      }
+
+      showToast('Trade added successfully', 'success');
       navigation.goBack();
-    } catch (err) { Alert.alert('Error', getErrorMessage(err)); }
+    } catch (err) { showToast(getErrorMessage(err), 'error'); }
+  };
+
+  const pickImages = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      showToast('Please allow access to your photo library.', 'error');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: true,
+      quality: 0.8,
+      selectionLimit: 10,
+    });
+    if (!result.canceled && result.assets) {
+      const newImgs: LocalImage[] = result.assets.map((asset, idx) => ({
+        uri: asset.uri,
+        name: asset.fileName || `screenshot_${Date.now()}_${idx}.jpg`,
+        mimeType: asset.mimeType || 'image/jpeg',
+        screenshotType: 'before',
+      }));
+      setLocalImages((prev) => [...prev, ...newImgs].slice(0, 10));
+    }
+  };
+
+  const captureImage = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      showToast('Please allow camera access.', 'error');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({ quality: 0.8 });
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      const newImg: LocalImage = {
+        uri: asset.uri,
+        name: asset.fileName || `screenshot_${Date.now()}.jpg`,
+        mimeType: asset.mimeType || 'image/jpeg',
+        screenshotType: 'before',
+      };
+      setLocalImages((prev) => [...prev, newImg].slice(0, 10));
+    }
+  };
+
+  const removeImage = (idx: number) => {
+    setLocalImages((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const cycleScreenshotType = (idx: number) => {
+    const types: Array<'before' | 'after' | 'markup'> = ['before', 'after', 'markup'];
+    setLocalImages((prev) => prev.map((img, i) => {
+      if (i !== idx) return img;
+      const nextType = types[(types.indexOf(img.screenshotType) + 1) % types.length];
+      return { ...img, screenshotType: nextType };
+    }));
   };
 
   const pairSuggestions = pairFocused && pairValue
@@ -379,7 +502,7 @@ export const AddTradeScreen: React.FC = () => {
                   </View>
                   <TextInput
                     style={[typography.body, { color: colors.textPrimary, backgroundColor: colors.surfaceElevated, borderColor: colors.border, borderWidth: 1, borderRadius: radii.md, padding: spacing[4], height: 100, textAlignVertical: 'top' }]}
-                    placeholder="What confluence or signal triggered this trade?"
+                    placeholder="What signal or strategy rules triggered this trade?"
                     placeholderTextColor={colors.textDisabled}
                     multiline numberOfLines={4}
                     value={value} onChangeText={onChange}
@@ -415,8 +538,26 @@ export const AddTradeScreen: React.FC = () => {
                 </View>
               )} />
 
+              <Controller control={control} name="emotionDuring" render={({ field: { onChange, value } }) => (
+                <View style={{ marginBottom: spacing[4] }}>
+                  <Text style={[typography.label, { color: colors.textSecondary, marginBottom: spacing[2] }]}>Emotion During Trade</Text>
+                  <View style={styles.grid3}>
+                    {EMOTIONS_DURING.map((e) => (
+                      <EmotionCard
+                        key={e.value}
+                        label={e.label}
+                        icon={e.icon as any}
+                        selected={value === e.value}
+                        onPress={() => onChange(e.value === value ? undefined : e.value)}
+                        style={{ width: '32%', marginBottom: spacing[2] }}
+                      />
+                    ))}
+                  </View>
+                </View>
+              )} />
+
               <Controller control={control} name="emotionAfter" render={({ field: { onChange, value } }) => (
-                <View style={{ marginBottom: spacing[5] }}>
+                <View style={{ marginBottom: spacing[3] }}>
                   <Text style={[typography.label, { color: colors.textSecondary, marginBottom: spacing[2] }]}>Emotion After Trade</Text>
                   <View style={styles.grid3}>
                     {EMOTIONS_AFTER.map((e) => (
@@ -432,6 +573,8 @@ export const AddTradeScreen: React.FC = () => {
                   </View>
                 </View>
               )} />
+
+
 
               <Text style={[typography.label, { color: colors.textSecondary, marginBottom: spacing[3] }]}>Discipline Checklist</Text>
               {DISCIPLINE_ITEMS.map((item) => (
@@ -467,6 +610,54 @@ export const AddTradeScreen: React.FC = () => {
             <View>
               <Text style={[typography.h3, { color: colors.textPrimary, marginBottom: spacing[4] }]}>Notes & Tags</Text>
 
+              {/* ── Screenshots picker ── */}
+              <View style={{ marginBottom: spacing[4] }}>
+                <View style={[styles.labelWithIcon, { marginBottom: spacing[2] }]}>
+                  <Ionicons name="images-outline" size={14} color={colors.textTertiary} style={{ marginRight: 5 }} />
+                  <Text style={[typography.label, { color: colors.textSecondary }]}>Screenshots</Text>
+                </View>
+                {/* Thumbnail strip */}
+                {localImages.length > 0 && (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: spacing[2] }}>
+                    <View style={{ flexDirection: 'row', gap: spacing[2] }}>
+                      {localImages.map((img, idx) => (
+                        <View key={`${img.uri}-${idx}`} style={{ width: 100, height: 100, borderRadius: radii.md, overflow: 'hidden', backgroundColor: colors.surfaceElevated }}>
+                          <TouchableOpacity activeOpacity={0.9} onPress={() => setSelectedImage(img.uri)} style={StyleSheet.absoluteFill}>
+                            <Image source={{ uri: img.uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                          </TouchableOpacity>
+                          {/* Remove button */}
+                          <TouchableOpacity
+                            onPress={() => removeImage(idx)}
+                            style={[{ position: 'absolute', top: 4, right: 4, width: 20, height: 20, borderRadius: 10, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' }]}
+                          >
+                            <Ionicons name="close" size={12} color="#fff" />
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </View>
+                  </ScrollView>
+                )}
+                {/* Pick / capture buttons */}
+                <View style={{ flexDirection: 'row', gap: spacing[2] }}>
+                  <TouchableOpacity
+                    onPress={pickImages}
+                    style={[{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceElevated, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, paddingVertical: spacing[3], gap: spacing[2] }]}
+                  >
+                    <Ionicons name="image-outline" size={18} color={colors.primary} />
+                    <Text style={[typography.labelSm, { color: colors.primary }]}>Gallery</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={captureImage}
+                    style={[{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceElevated, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, paddingVertical: spacing[3], gap: spacing[2] }]}
+                  >
+                    <Ionicons name="camera-outline" size={18} color={colors.primary} />
+                    <Text style={[typography.labelSm, { color: colors.primary }]}>Camera</Text>
+                  </TouchableOpacity>
+                </View>
+                <Text style={[typography.caption, { color: colors.textTertiary, marginTop: spacing[1] }]}>
+                  Max 10 images.
+                </Text>
+              </View>
               <Controller control={control} name="notes" render={({ field: { onChange, value } }) => (
                 <View style={{ marginBottom: spacing[4] }}>
                   <View style={[styles.labelWithIcon, { marginBottom: spacing[2] }]}>
@@ -570,6 +761,12 @@ export const AddTradeScreen: React.FC = () => {
           loading={activeSection === 'Notes' && isPending}
         />
       </View>
+
+      <ImageViewerModal
+        visible={!!selectedImage}
+        imageUrl={selectedImage}
+        onClose={() => setSelectedImage(null)}
+      />
     </KeyboardAvoidingView>
   );
 };

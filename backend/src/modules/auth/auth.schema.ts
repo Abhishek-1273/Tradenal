@@ -51,6 +51,7 @@ export const updateSettingsSchema = z.object({
   defaultRisk: z.number().min(0.1).max(10).optional(),
   defaultRR: z.number().min(0.5).max(20).optional(),
   timezone: z.string().optional(),
+  brokerGmtOffset: z.number().min(-12).max(14).optional(),
   notifications: z
     .object({
       dailyReminder: z.boolean().optional(),

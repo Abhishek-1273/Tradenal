@@ -6,6 +6,7 @@ import {
   VictoryAxis,
   VictoryTooltip,
   VictoryVoronoiContainer,
+  VictoryLabel,
 } from 'victory-native';
 import { useTheme } from '../../theme';
 
@@ -35,7 +36,7 @@ export const BarChart: React.FC<BarChartProps> = ({
   yLabel,
   positiveColor,
   negativeColor,
-  showTooltip = true,
+  showTooltip = false,
   tickFormat,
   horizontalPadding = 64,
 }) => {
@@ -112,6 +113,17 @@ export const BarChart: React.FC<BarChartProps> = ({
       />
       <VictoryBar
         data={data}
+        labels={({ datum }) => `${datum.y >= 0 ? '+' : ''}${datum.y.toFixed(1)}R`}
+        labelComponent={
+          <VictoryLabel
+            dy={({ datum }) => datum.y >= 0 ? -6 : 10}
+            style={{
+              fill: colors.textPrimary,
+              fontSize: 8.5,
+              fontWeight: '600',
+            }}
+          />
+        }
         style={{
           data: {
             fill: ({ datum }: any) => (datum.y >= 0 ? pos : neg),

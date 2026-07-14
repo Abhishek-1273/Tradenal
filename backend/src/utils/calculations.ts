@@ -89,6 +89,11 @@ export interface DisciplineInput {
   riskPercent: number;
   emotionBefore: string;
   mistakes: string[];
+  checkedHigherTimeframe?: boolean;
+  waitedForConfirmation?: boolean;
+  sizedCorrectly?: boolean;
+  withinDailyLossLimit?: boolean;
+  singleTradeDominance?: boolean;
 }
 
 export const calculateDisciplineScore = (inputs: DisciplineInput[]): number => {
@@ -97,34 +102,46 @@ export const calculateDisciplineScore = (inputs: DisciplineInput[]): number => {
   const scores = inputs.map((trade) => {
     let score = 0;
 
-    // Followed plan (20 pts)
-    if (trade.followedPlan) score += 20;
+    // Followed plan (15 pts)
+    if (trade.followedPlan) score += 15;
 
-    // No revenge trading (20 pts)
-    if (!trade.revengeTrade) score += 20;
+    // No revenge trading (15 pts)
+    if (!trade.revengeTrade) score += 15;
 
-    // No overtrading (15 pts)
-    if (!trade.overtraded) score += 15;
+    // No overtrading (10 pts)
+    if (!trade.overtraded) score += 10;
 
-    // RR quality (15 pts)
-    if (trade.riskReward >= 2) score += 15;
-    else if (trade.riskReward >= 1.5) score += 10;
-    else if (trade.riskReward >= 1) score += 5;
+    // RR quality (10 pts)
+    if (trade.riskReward >= 2) score += 10;
+    else if (trade.riskReward >= 1.5) score += 7;
+    else if (trade.riskReward >= 1) score += 4;
 
-    // Risk management (15 pts)
-    if (trade.riskPercent <= 1) score += 15;
-    else if (trade.riskPercent <= 2) score += 10;
-    else if (trade.riskPercent <= 3) score += 5;
+    // Risk management (10 pts)
+    if (trade.riskPercent <= 1) score += 10;
+    else if (trade.riskPercent <= 2) score += 7;
+    else if (trade.riskPercent <= 3) score += 4;
 
-    // Emotion control (10 pts)
+    // Emotion control (5 pts)
     const calmEmotions = ['calm', 'confident'];
-    if (calmEmotions.includes(trade.emotionBefore.toLowerCase())) score += 10;
-    else if (!['greedy', 'fomo', 'fear'].includes(trade.emotionBefore.toLowerCase())) score += 5;
+    if (calmEmotions.includes(trade.emotionBefore.toLowerCase())) score += 5;
+    else if (!['greedy', 'fomo', 'fear'].includes(trade.emotionBefore.toLowerCase())) score += 2;
 
     // No SL movement (5 pts)
     if (!trade.movedSL) score += 5;
 
-    return Math.min(score, 100);
+    // New discipline fields (2 pts each)
+    if (trade.checkedHigherTimeframe) score += 2;
+    if (trade.waitedForConfirmation) score += 2;
+    if (trade.sizedCorrectly !== false) score += 2;
+    if (trade.withinDailyLossLimit !== false) score += 2;
+    if (trade.singleTradeDominance !== false) score += 2;
+
+    // Penalize common mistakes slightly
+    const badMistakes = ['noHigherTFCheck', 'chasedPrice', 'modifiedOrderRepeatedly', 'stackedTooManyConfluences'];
+    const badCount = trade.mistakes.filter(m => badMistakes.includes(m)).length;
+    score -= badCount * 2;
+
+    return Math.min(Math.max(score, 0), 100);
   });
 
   const avg = scores.reduce((a, b) => a + b, 0) / scores.length;

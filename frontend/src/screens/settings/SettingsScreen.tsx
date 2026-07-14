@@ -14,6 +14,34 @@ import { useUpdateSettings, useChangePassword, useLogout, useDeleteAccount } fro
 import { Input } from '../../components/common/Input';
 import { Button } from '../../components/common/Button';
 import { Card } from '../../components/common/Card';
+import { useToast } from '../../components/common/Toast';
+
+const formatGmtOffset = (offset: number): string => {
+  if (offset === 0) return '0';
+  const isNegative = offset < 0;
+  const absOffset = Math.abs(offset);
+  const hours = Math.floor(absOffset);
+  const minutes = Math.round((absOffset - hours) * 60);
+  if (minutes === 0) {
+    return `${isNegative ? '-' : '+'}${hours}`;
+  }
+  return `${isNegative ? '-' : '+'}${hours}:${String(minutes).padStart(2, '0')}`;
+};
+
+const parseGmtOffset = (val: string): number => {
+  if (!val) return 0;
+  const cleanVal = val.trim();
+  const isNegative = cleanVal.startsWith('-');
+  const unsignedVal = isNegative ? cleanVal.slice(1) : cleanVal.startsWith('+') ? cleanVal.slice(1) : cleanVal;
+  if (unsignedVal.includes(':')) {
+    const parts = unsignedVal.split(':');
+    const hours = Math.abs(parseInt(parts[0]) || 0);
+    const minutes = Math.abs(parseInt(parts[1]) || 0);
+    const decimal = hours + minutes / 60;
+    return isNegative ? -decimal : decimal;
+  }
+  return parseFloat(cleanVal) || 0;
+};
 
 type Section = 'main' | 'password' | 'defaults';
 
@@ -26,10 +54,14 @@ export const SettingsScreen: React.FC = () => {
   const { mutateAsync: updateSettings, isPending: savingSettings } = useUpdateSettings();
   const { mutateAsync: changePassword, isPending: changingPass } = useChangePassword();
   const { mutate: doLogout, isPending: loggingOut } = useLogout();
+  const { showToast } = useToast();
 
   const [section, setSection] = useState<Section>('main');
   const [defaultRisk, setDefaultRisk] = useState(user?.settings?.defaultRisk?.toString() ?? '1');
   const [defaultRR, setDefaultRR] = useState(user?.settings?.defaultRR?.toString() ?? '2');
+  const [brokerGmtOffset, setBrokerGmtOffset] = useState(
+    user?.settings?.brokerGmtOffset !== undefined ? formatGmtOffset(user.settings.brokerGmtOffset) : '0'
+  );
   const [currentPass, setCurrentPass] = useState('');
   const [newPass, setNewPass] = useState('');
   const [confirmPass, setConfirmPass] = useState('');
@@ -46,10 +78,11 @@ export const SettingsScreen: React.FC = () => {
       await updateSettings({
         defaultRisk: parseFloat(defaultRisk) || 1,
         defaultRR: parseFloat(defaultRR) || 2,
+        brokerGmtOffset: parseGmtOffset(brokerGmtOffset),
       });
-      Alert.alert('Saved', 'Default settings updated successfully.');
+      showToast('Default settings updated successfully.', 'success');
     } catch (e: any) {
-      Alert.alert('Error', e.message);
+      showToast(e.message || 'Failed to update defaults.', 'error');
     }
   };
 
@@ -69,7 +102,7 @@ export const SettingsScreen: React.FC = () => {
     }
     try {
       await changePassword({ currentPassword: currentPass, newPassword: newPass });
-      Alert.alert('Success', 'Password changed. Please log in again.');
+      showToast('Password changed successfully.', 'success');
       doLogout();
     } catch (e: any) {
       setPassError(e.message || 'Failed to change password.');
@@ -91,7 +124,7 @@ export const SettingsScreen: React.FC = () => {
     try {
       await deleteAccountMutate(deletePassword);
       setDeleteModalVisible(false);
-      Alert.alert('Deactivated', 'Your account has been deactivated successfully.');
+      showToast('Your account has been deactivated successfully.', 'success');
     } catch (e: any) {
       setDeleteError(e.message || 'Failed to deactivate account.');
     }
@@ -241,8 +274,8 @@ export const SettingsScreen: React.FC = () => {
             <Text style={[typography.labelSm, { color: colors.textTertiary, marginBottom: spacing[2] }]}>TRADING</Text>
             <Card style={{ marginBottom: spacing[5] }}>
               <SectionLink
-                icon="options-outline" label="Default Risk & RR"
-                subtitle={`Risk: ${user?.settings?.defaultRisk ?? 1}% · RR: ${user?.settings?.defaultRR ?? 2}`}
+                icon="options-outline" label="Default Risk, RR & GMT"
+                subtitle={`Risk: ${user?.settings?.defaultRisk ?? 1}% · RR: ${user?.settings?.defaultRR ?? 2} · GMT: ${user?.settings?.brokerGmtOffset !== undefined ? formatGmtOffset(user.settings.brokerGmtOffset) : '0'}`}
                 onPress={() => setSection('defaults')}
                 iconColor={colors.warning}
               />
@@ -301,7 +334,7 @@ export const SettingsScreen: React.FC = () => {
             </Card>
 
             <Text style={[typography.caption, { color: colors.textTertiary, textAlign: 'center', marginBottom: spacing[4] }]}>
-              Tradenal v1.0.0 • Ryu@2026
+              Tradenal v1.0.0 • Ryu © 2026
             </Text>
           </>
         )}
@@ -329,6 +362,14 @@ export const SettingsScreen: React.FC = () => {
               keyboardType="decimal-pad"
               hint="Minimum recommended: 1.5R"
               rightIcon={<Text style={{ color: colors.textTertiary, marginRight: 12 }}>R</Text>}
+            />
+            <Input
+              label="Default Broker GMT Offset"
+              placeholder="e.g. 5:30 or 5.5"
+              value={brokerGmtOffset}
+              onChangeText={setBrokerGmtOffset}
+              keyboardType="numbers-and-punctuation"
+              hint="Supports 5:30 (for India), 5.5, or -5 (for EST)"
             />
             <Button
               label="Save Defaults"

@@ -10,9 +10,11 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0A0A0B"
+      "backgroundColor": "#FFFFFF"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.tradenal.app",
@@ -21,7 +23,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0A0A0B"
+        "backgroundColor": "#FFFFFF"
       },
       "package": "com.tradenal.app",
       "versionCode": 1,
@@ -30,7 +32,8 @@
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.RECEIVE_BOOT_COMPLETED",
-        "android.permission.VIBRATE"
+        "android.permission.VIBRATE",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "web": {
@@ -49,8 +52,9 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "your-eas-project-id"
+        "projectId": "81d96982-cadd-4478-a69a-8416681d3e27"
       }
-    }
+    },
+    "owner": "self_crafted01"
   }
 }

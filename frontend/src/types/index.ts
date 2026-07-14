@@ -15,6 +15,7 @@ export interface UserSettings {
   defaultRisk: number;
   defaultRR: number;
   timezone: string;
+  brokerGmtOffset: number;
   notifications: {
     dailyReminder: boolean;
     weeklyReview: boolean;
@@ -45,10 +46,14 @@ export type TradeSetup =
   | 'trendFollowing'
   | 'scalp'
   | 'swing'
+  | 'orderBlock'
+  | 'fairValueGap'
+  | 'liquiditySweepReversal'
   | 'custom';
 export type TradeResult = 'win' | 'loss' | 'breakeven' | 'partialWin';
 export type EmotionBefore = 'confident' | 'fear' | 'greedy' | 'fomo' | 'calm' | 'excited';
-export type EmotionAfter = 'happy' | 'frustrated' | 'angry' | 'satisfied' | 'neutral';
+export type EmotionAfter = 'happy' | 'frustrated' | 'angry' | 'satisfied' | 'neutral' | 'regretful';
+export type EmotionDuring = 'calm' | 'anxious' | 'doubtful' | 'tempted_to_close' | 'tempted_to_move_sl' | 'confident_held';
 export type TradeMistake =
   | 'enteredEarly'
   | 'lateEntry'
@@ -59,6 +64,10 @@ export type TradeMistake =
   | 'noSL'
   | 'closedEarly'
   | 'heldTooLong'
+  | 'modifiedOrderRepeatedly'
+  | 'chasedPrice'
+  | 'noHigherTFCheck'
+  | 'stackedTooManyConfluences'
   | 'custom';
 
 export interface Screenshot {
@@ -92,13 +101,20 @@ export interface Trade {
   customSetup?: string;
   result: TradeResult;
   emotionBefore?: EmotionBefore;
+  emotionDuring?: EmotionDuring;
   emotionAfter?: EmotionAfter;
+  confluenceCount?: number;
   followedPlan: boolean;
   overtraded: boolean;
   movedSL: boolean;
   movedTP: boolean;
   revengeTrade: boolean;
   newsTrade: boolean;
+  checkedHigherTimeframe: boolean;
+  waitedForConfirmation: boolean;
+  sizedCorrectly: boolean;
+  withinDailyLossLimit: boolean;
+  singleTradeDominance: boolean;
   mistakes: TradeMistake[];
   customMistake?: string;
   screenshots: Screenshot[];
@@ -129,13 +145,20 @@ export interface CreateTradePayload {
   customSetup?: string;
   result: TradeResult;
   emotionBefore?: EmotionBefore;
+  emotionDuring?: EmotionDuring;
   emotionAfter?: EmotionAfter;
+  confluenceCount?: number;
   followedPlan: boolean;
   overtraded: boolean;
   movedSL: boolean;
   movedTP: boolean;
   revengeTrade: boolean;
   newsTrade: boolean;
+  checkedHigherTimeframe: boolean;
+  waitedForConfirmation: boolean;
+  sizedCorrectly: boolean;
+  withinDailyLossLimit: boolean;
+  singleTradeDominance: boolean;
   mistakes: TradeMistake[];
   customMistake?: string;
   reasonForEntry?: string;

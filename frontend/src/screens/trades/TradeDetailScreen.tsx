@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Alert, Image, Dimensions,
@@ -16,11 +16,48 @@ import { LoadingOverlay } from '../../components/common/LoadingOverlay';
 import { TradeDetailRouteProp, AppNavProp } from '../../navigation/types';
 import {
   formatDate, formatDuration, getResultColor, getSetupLabel,
-  getSessionLabel, getEmotionEmoji, getMistakeLabel, getDisciplineScoreColor, formatPnL
+  getSessionLabel, getEmotionEmoji, getEmotionDuringEmoji, getEmotionDuringLabel,
+  getMistakeLabel, getDisciplineScoreColor, formatPnL
 } from '../../utils/formatters';
 import { useAccountStore } from '../../store/account.store';
+import { BASE_URL } from '../../api/client';
+import { ImageViewerModal } from '../../components/common/ImageViewerModal';
 
 const { width: SW } = Dimensions.get('window');
+
+const getEmotionConfig = (emotion: string, colors: any): { icon: string; color: string; bg: string } => {
+  const configs: Record<string, { icon: string; color: string; bg: string }> = {
+    confident: { icon: 'shield-checkmark-outline', color: colors.success, bg: colors.success + '15' },
+    fear: { icon: 'warning-outline', color: colors.error, bg: colors.error + '15' },
+    greedy: { icon: 'wallet-outline', color: colors.warning, bg: colors.warning + '15' },
+    fomo: { icon: 'alarm-outline', color: colors.error, bg: colors.error + '15' },
+    calm: { icon: 'leaf-outline', color: colors.primary, bg: colors.primary + '15' },
+    excited: { icon: 'flash-outline', color: colors.warning, bg: colors.warning + '15' },
+    happy: { icon: 'happy-outline', color: colors.success, bg: colors.success + '15' },
+    frustrated: { icon: 'sad-outline', color: colors.error, bg: colors.error + '15' },
+    angry: { icon: 'flame-outline', color: colors.error, bg: colors.error + '15' },
+    satisfied: { icon: 'checkmark-circle-outline', color: colors.success, bg: colors.success + '15' },
+    neutral: { icon: 'remove-circle-outline', color: colors.textTertiary, bg: colors.surfaceHighlight },
+    regretful: { icon: 'arrow-undo-outline', color: colors.textSecondary, bg: colors.surfaceHighlight },
+    bored: { icon: 'bed-outline', color: colors.textTertiary, bg: colors.surfaceHighlight },
+    tired: { icon: 'battery-dead-outline', color: colors.textSecondary, bg: colors.surfaceHighlight },
+    distracted: { icon: 'eye-off-outline', color: colors.textSecondary, bg: colors.surfaceHighlight },
+    // During
+    anxious: { icon: 'alert-circle-outline', color: colors.error, bg: colors.error + '15' },
+    doubtful: { icon: 'help-circle-outline', color: colors.warning, bg: colors.warning + '15' },
+    tempted_to_close: { icon: 'exit-outline', color: colors.error, bg: colors.error + '15' },
+    tempted_to_move_sl: { icon: 'trending-down-outline', color: colors.error, bg: colors.error + '15' },
+    confident_held: { icon: 'shield-checkmark-outline', color: colors.success, bg: colors.success + '15' },
+    impatient: { icon: 'hourglass-outline', color: colors.warning, bg: colors.warning + '15' },
+    tempted_to_add: { icon: 'add-circle-outline', color: colors.warning, bg: colors.warning + '15' },
+    panicky: { icon: 'pulse-outline', color: colors.error, bg: colors.error + '15' },
+    // After
+    relieved: { icon: 'heart-outline', color: colors.primary, bg: colors.primary + '15' },
+    proud: { icon: 'ribbon-outline', color: colors.success, bg: colors.success + '15' },
+    disappointed: { icon: 'thumbs-down-outline', color: colors.error, bg: colors.error + '15' },
+  };
+  return configs[emotion] || { icon: 'happy-outline', color: colors.textSecondary, bg: colors.surfaceHighlight };
+};
 
 export const TradeDetailScreen: React.FC = () => {
   const { colors, typography, spacing, radii } = useTheme();
@@ -31,6 +68,8 @@ export const TradeDetailScreen: React.FC = () => {
   const { mutate: deleteTrade } = useDeleteTrade();
   const { mutate: toggleFavorite } = useToggleFavorite();
   const { activeAccount } = useAccountStore();
+
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   if (isLoading) return <LoadingOverlay fullScreen message="Loading trade..." />;
   if (!trade) return null;
@@ -56,6 +95,11 @@ export const TradeDetailScreen: React.FC = () => {
   if (trade.movedSL) disciplineScore -= 15;
   if ((trade.riskReward ?? 0) < 1) disciplineScore -= 15;
   if ((trade.riskPercent ?? 0) > 3) disciplineScore -= 10;
+  if (!trade.checkedHigherTimeframe) disciplineScore -= 5;
+  if (!trade.waitedForConfirmation) disciplineScore -= 5;
+  if (trade.sizedCorrectly === false) disciplineScore -= 5;
+  if (trade.withinDailyLossLimit === false) disciplineScore -= 10;
+  if (trade.singleTradeDominance === false) disciplineScore -= 5;
   disciplineScore = Math.max(0, disciplineScore);
 
   const InfoRow = ({
@@ -192,19 +236,25 @@ export const TradeDetailScreen: React.FC = () => {
             </Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -spacing[5] }}>
               <View style={{ paddingHorizontal: spacing[5], flexDirection: 'row', gap: spacing[3] }}>
-                {trade.screenshots.map((s) => (
-                  <View key={s.publicId} style={[{
-                    width: SW * 0.72, height: 190, borderRadius: radii.xl, overflow: 'hidden',
-                  }]}>
-                    <Image source={{ uri: s.url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-                    <View style={[{
-                      position: 'absolute', bottom: 8, left: 8,
-                      backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6,
-                    }]}>
-                      <Text style={[typography.caption, { color: '#fff', textTransform: 'capitalize' }]}>{s.type}</Text>
-                    </View>
-                  </View>
-                ))}
+                 {trade.screenshots.map((s) => {
+                    const fullUrl = s.url.startsWith('/') ? `${BASE_URL.replace('/api', '')}${s.url}` : s.url;
+                    return (
+                      <TouchableOpacity
+                        key={s.publicId}
+                        activeOpacity={0.9}
+                        onPress={() => setSelectedImage(fullUrl)}
+                        style={[{
+                          width: SW * 0.72, height: 190, borderRadius: radii.xl, overflow: 'hidden',
+                        }]}
+                      >
+                        <Image
+                          source={{ uri: fullUrl }}
+                          style={{ width: '100%', height: '100%' }}
+                          resizeMode="cover"
+                        />
+                      </TouchableOpacity>
+                    );
+                  })}
               </View>
             </ScrollView>
           </View>
@@ -224,27 +274,36 @@ export const TradeDetailScreen: React.FC = () => {
             value={trade.takeProfit != null ? trade.takeProfit.toString() : 'Not Set'}
             valueColor={trade.takeProfit != null ? colors.success : colors.textTertiary}
           />
-          {trade.exitPrice !== undefined && (
-            <InfoRow label="Exit Price" value={trade.exitPrice.toString()} valueColor={resultColor} last />
-          )}
+          <InfoRow
+            label="Exit Price"
+            value={trade.exitPrice != null ? trade.exitPrice.toString() : 'Not Set'}
+            valueColor={trade.exitPrice != null ? colors.textPrimary : colors.textTertiary}
+            last
+          />
         </Card>
 
         {/* ── Psychology ── */}
         <Card style={{ marginBottom: spacing[4] }}>
-          <Text style={[typography.h3, { color: colors.textPrimary, marginBottom: spacing[2] }]}>Psychology</Text>
+          <Text style={[typography.h3, { color: colors.textPrimary, marginBottom: spacing[3] }]}>Psychology</Text>
 
-          {trade.emotionBefore && (
-            <InfoRow
-              label="Before Trade"
-              value={`${getEmotionEmoji(trade.emotionBefore)} ${trade.emotionBefore.charAt(0).toUpperCase() + trade.emotionBefore.slice(1)}`}
-            />
-          )}
-          {trade.emotionAfter && (
-            <InfoRow
-              label="After Trade"
-              value={`${getEmotionEmoji(trade.emotionAfter)} ${trade.emotionAfter.charAt(0).toUpperCase() + trade.emotionAfter.slice(1)}`}
-            />
-          )}
+          <View style={{ flexDirection: 'row', gap: spacing[2.5], marginBottom: spacing[3] }}>
+            {[
+              { key: 'Before', val: trade.emotionBefore, label: trade.emotionBefore ? (trade.emotionBefore.charAt(0).toUpperCase() + trade.emotionBefore.slice(1)) : null },
+              { key: 'During', val: trade.emotionDuring, label: trade.emotionDuring ? getEmotionDuringLabel(trade.emotionDuring) : null },
+              { key: 'After', val: trade.emotionAfter, label: trade.emotionAfter ? (trade.emotionAfter.charAt(0).toUpperCase() + trade.emotionAfter.slice(1)) : null },
+            ].filter(item => item.val).map(item => {
+              const config = getEmotionConfig(item.val!, colors);
+              return (
+                <View key={item.key} style={[{ flex: 1, backgroundColor: colors.surfaceElevated, borderRadius: radii.md, paddingVertical: spacing[3], paddingHorizontal: spacing[1], borderWidth: 1, borderColor: colors.border, alignItems: 'center' }]}>
+                  <Text style={[typography.caption, { color: colors.textTertiary, textTransform: 'uppercase', fontSize: 9, fontWeight: '700', marginBottom: 6 }]}>{item.key}</Text>
+                  <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: config.bg, alignItems: 'center', justifyContent: 'center', marginBottom: 6 }}>
+                    <Ionicons name={config.icon as any} size={16} color={config.color} />
+                  </View>
+                  <Text numberOfLines={1} style={[typography.labelSm, { color: colors.textPrimary, fontSize: 10.5, fontWeight: '600', textAlign: 'center' }]}>{item.label}</Text>
+                </View>
+              );
+            })}
+          </View>
 
           {/* Discipline checks */}
           <View style={{ marginTop: spacing[2] }}>
@@ -255,6 +314,11 @@ export const TradeDetailScreen: React.FC = () => {
               { label: 'Moved Stop Loss', value: trade.movedSL, positive: false },
               { label: 'Moved Take Profit', value: trade.movedTP, positive: false },
               { label: 'News Trade', value: trade.newsTrade, positive: null },
+              { label: 'Checked Higher TF', value: trade.checkedHigherTimeframe, positive: true },
+              { label: 'Waited Confirmation', value: trade.waitedForConfirmation, positive: true },
+              { label: 'Sized Correctly', value: trade.sizedCorrectly, positive: true },
+              { label: 'Within Daily Loss Limit', value: trade.withinDailyLossLimit, positive: true },
+              { label: 'Single Trade Dominance', value: trade.singleTradeDominance, positive: true },
             ].map((item, i, arr) => (
               <View
                 key={item.label}
@@ -369,6 +433,12 @@ export const TradeDetailScreen: React.FC = () => {
           <InfoRow label="Logged" value={formatDate(trade.createdAt, 'DD MMM YYYY, HH:mm')} last />
         </Card>
       </ScrollView>
+
+      <ImageViewerModal
+        visible={!!selectedImage}
+        imageUrl={selectedImage}
+        onClose={() => setSelectedImage(null)}
+      />
     </View>
   );
 };

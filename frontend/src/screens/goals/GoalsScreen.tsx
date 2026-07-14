@@ -26,6 +26,7 @@ import { formatPercent, getDisciplineScoreColor, formatPnL, formatBalance } from
 import { useAccountStore } from '../../store/account.store';
 import { useUpdateAccount } from '../../hooks/useAccounts';
 import { statsApi } from '../../api/stats.api';
+import { useToast } from '../../components/common/Toast';
 
 const CURRENT_MONTH = dayjs().format('YYYY-MM');
 
@@ -35,6 +36,7 @@ export const GoalsScreen: React.FC = () => {
 
   const { activeAccount } = useAccountStore();
   const updateAccountMutation = useUpdateAccount(activeAccount?._id || '');
+  const { showToast } = useToast();
 
   // Tab state: 'targets' (Account targets) or 'goals' (Legacy monthly goals)
   const [activeTab, setActiveTab] = useState<'targets' | 'goals'>('targets');
@@ -125,9 +127,9 @@ export const GoalsScreen: React.FC = () => {
         });
       }
       setShowTargetsModal(false);
-      Alert.alert('Success', 'Account targets updated successfully');
+      showToast('Account targets updated successfully', 'success');
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Failed to save targets');
+      showToast(err?.message || 'Failed to save targets', 'error');
     }
   };
 
@@ -149,8 +151,9 @@ export const GoalsScreen: React.FC = () => {
         ...(form.targetTrades ? { targetTrades: parseInt(form.targetTrades) } : {}),
       });
       setShowModal(false);
+      showToast('Monthly goal saved successfully', 'success');
     } catch (e: any) {
-      Alert.alert('Error', e.message || 'Failed to save goal');
+      showToast(e.message || 'Failed to save goal', 'error');
     }
   };
 
@@ -158,9 +161,9 @@ export const GoalsScreen: React.FC = () => {
     if (!activeAccount) return;
     try {
       await updateAccountMutation.mutateAsync({ status });
-      Alert.alert('Success', `Account status updated to ${status}`);
+      showToast(`Account status updated to ${status}`, 'success');
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Failed to update status');
+      showToast(err?.message || 'Failed to update status', 'error');
     }
   };
 
@@ -186,9 +189,9 @@ export const GoalsScreen: React.FC = () => {
 
     return (
       <View style={{ marginBottom: spacing[4] }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing[1] }}>
-          <Text style={[typography.body, { color: colors.textSecondary }]}>{label}</Text>
-          <Text style={[typography.label, { color: isPrimaryColor }]}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing[1] }}>
+          <Text style={[typography.body, { color: colors.textSecondary, flex: 1, marginRight: 8 }]} numberOfLines={1}>{label}</Text>
+          <Text style={[typography.label, { color: isPrimaryColor, textAlign: 'right' }]}>
             {format(current)} <Text style={{ color: colors.textTertiary, fontWeight: '400' }}>/ {format(target)}</Text>
           </Text>
         </View>
@@ -425,7 +428,7 @@ export const GoalsScreen: React.FC = () => {
                     current={todayLoss}
                     target={maxDailyLossAmount}
                     percentage={dailyLossPercentUsed}
-                    format={(v) => formatPnL(v, currency)}
+                    format={(v) => formatPnL(-v, currency)}
                     isLossLimit
                   />
                 )}
@@ -433,11 +436,11 @@ export const GoalsScreen: React.FC = () => {
                 {/* Max Overall Drawdown */}
                 {maxOverallLossPercent > 0 && (
                   <ProgressBar
-                    label="Max Drawdown (Overall Loss)"
+                    label="Max Overall Loss"
                     current={currentDrawdown}
                     target={maxOverallLossAmount}
                     percentage={overallLossPercentUsed}
-                    format={(v) => formatPnL(v, currency)}
+                    format={(v) => formatPnL(-v, currency)}
                     isLossLimit
                   />
                 )}
@@ -520,7 +523,7 @@ export const GoalsScreen: React.FC = () => {
                     current={todayLoss}
                     target={maxDailyLossAmount}
                     percentage={dailyLossPercentUsed}
-                    format={(v) => formatPnL(v, currency)}
+                    format={(v) => formatPnL(-v, currency)}
                     isLossLimit
                   />
                 )}
@@ -532,7 +535,7 @@ export const GoalsScreen: React.FC = () => {
                     current={currentDrawdown}
                     target={maxOverallLossAmount}
                     percentage={overallLossPercentUsed}
-                    format={(v) => formatPnL(v, currency)}
+                    format={(v) => formatPnL(-v, currency)}
                     isLossLimit
                   />
                 )}

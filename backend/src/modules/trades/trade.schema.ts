@@ -2,11 +2,12 @@ import { z } from 'zod';
 
 const TRADE_TYPES = ['buy', 'sell'] as const;
 const SESSIONS = ['london', 'newyork', 'asian', 'overlap'] as const;
-const SETUPS = ['breakout', 'liquiditySweep', 'smc', 'ict', 'supportResistance', 'trendFollowing', 'scalp', 'swing', 'custom'] as const;
+const SETUPS = ['breakout', 'liquiditySweep', 'smc', 'ict', 'supportResistance', 'trendFollowing', 'scalp', 'swing', 'orderBlock', 'fairValueGap', 'liquiditySweepReversal', 'custom'] as const;
 const RESULTS = ['win', 'loss', 'breakeven', 'partialWin'] as const;
 const EMOTIONS_BEFORE = ['confident', 'fear', 'greedy', 'fomo', 'calm', 'excited'] as const;
-const EMOTIONS_AFTER = ['happy', 'frustrated', 'angry', 'satisfied', 'neutral'] as const;
-const MISTAKES = ['enteredEarly', 'lateEntry', 'noConfirmation', 'ignoredTrend', 'riskTooHigh', 'poorRR', 'noSL', 'closedEarly', 'heldTooLong', 'custom'] as const;
+const EMOTIONS_DURING = ['calm', 'anxious', 'doubtful', 'tempted_to_close', 'tempted_to_move_sl', 'confident_held'] as const;
+const EMOTIONS_AFTER = ['happy', 'frustrated', 'angry', 'satisfied', 'neutral', 'regretful'] as const;
+const MISTAKES = ['enteredEarly', 'lateEntry', 'noConfirmation', 'ignoredTrend', 'riskTooHigh', 'poorRR', 'noSL', 'closedEarly', 'heldTooLong', 'modifiedOrderRepeatedly', 'chasedPrice', 'noHigherTFCheck', 'stackedTooManyConfluences', 'custom'] as const;
 
 export const createTradeSchema = z.object({
   // Phase 1: optional accountId — if omitted, service falls back to user's default account
@@ -42,13 +43,20 @@ export const createTradeSchema = z.object({
   result: z.enum(RESULTS),
 
   emotionBefore: z.enum(EMOTIONS_BEFORE).optional(),
+  emotionDuring: z.enum(EMOTIONS_DURING).optional(),
   emotionAfter: z.enum(EMOTIONS_AFTER).optional(),
+  confluenceCount: z.number().int().min(0).max(20).default(0),
   followedPlan: z.boolean().default(true),
   overtraded: z.boolean().default(false),
   movedSL: z.boolean().default(false),
   movedTP: z.boolean().default(false),
   revengeTrade: z.boolean().default(false),
   newsTrade: z.boolean().default(false),
+  checkedHigherTimeframe: z.boolean().default(false),
+  waitedForConfirmation: z.boolean().default(false),
+  sizedCorrectly: z.boolean().default(true),
+  withinDailyLossLimit: z.boolean().default(true),
+  singleTradeDominance: z.boolean().default(true),
   mistakes: z.array(z.enum(MISTAKES)).default([]),
   customMistake: z.string().max(200).optional(),
 
