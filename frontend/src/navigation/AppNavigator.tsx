@@ -1,8 +1,8 @@
 import React, { useEffect } from 'react';
+import { View, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuthStore } from '../store/auth.store';
-import { LoadingOverlay } from '../components/common/LoadingOverlay';
 import { useTheme } from '../theme';
 import { useUIStore } from '../store/ui.store';
 
@@ -86,7 +86,11 @@ export const AppNavigatorRoot: React.FC = () => {
   }, []);
 
   if (!isInitialized) {
-    return <LoadingOverlay visible fullScreen message="Loading..." />;
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
   }
 
   return (
