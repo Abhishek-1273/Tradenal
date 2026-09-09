@@ -41,7 +41,9 @@ export const BottomTabNavigator: React.FC = () => {
 
   return (
     <Tab.Navigator
+      detachInactiveScreens={false}
       screenOptions={({ route }) => ({
+        lazy: false,
         headerShown: false,
         tabBarShowLabel: true,
         tabBarStyle: {
