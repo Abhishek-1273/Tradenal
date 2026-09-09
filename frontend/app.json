@@ -10,7 +10,7 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#FFFFFF"
+      "backgroundColor": "#070B14"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -21,9 +21,10 @@
       "buildNumber": "1"
     },
     "android": {
+      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#FFFFFF"
+        "backgroundColor": "#070B14"
       },
       "package": "com.tradenal.app",
       "versionCode": 1,
@@ -34,7 +35,17 @@
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.VIBRATE",
         "android.permission.RECORD_AUDIO"
-      ]
+      ],
+      "androidStatusBar": {
+        "barStyle": "light-content",
+        "backgroundColor": "#0B0E14",
+        "translucent": true
+      },
+      "androidNavigationBar": {
+        "visible": "always",
+        "barStyle": "light-content",
+        "backgroundColor": "#0B0E14"
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"

@@ -4,6 +4,7 @@ import { Account, CreateAccountPayload } from '../types';
 import { accountsApi } from '../api/accounts.api';
 
 const SELECTED_ACCOUNT_KEY = 'tj_selected_account_id';
+const CACHED_ACCOUNTS_KEY = 'tj_cached_accounts_list';
 
 interface AccountState {
   accounts: Account[];
@@ -28,7 +29,22 @@ export const useAccountStore = create<AccountState>((set, get) => ({
   error: null,
 
   fetchAccounts: async () => {
-    set({ isLoading: true, error: null });
+    // Instant cache hydration if memory is empty
+    if (get().accounts.length === 0) {
+      try {
+        const [cached, savedId] = await Promise.all([
+          AsyncStorage.getItem(CACHED_ACCOUNTS_KEY),
+          AsyncStorage.getItem(SELECTED_ACCOUNT_KEY),
+        ]);
+        if (cached) {
+          const parsed: Account[] = JSON.parse(cached);
+          let active = savedId ? parsed.find((a) => a._id === savedId) : null;
+          if (!active && parsed.length > 0) active = parsed.find((a) => a.isDefault) || parsed[0];
+          set({ accounts: parsed, activeAccount: active });
+        }
+      } catch { /* ignore */ }
+    }
+
     try {
       const accounts = await accountsApi.getAccounts();
       const savedAccountId = await AsyncStorage.getItem(SELECTED_ACCOUNT_KEY);
@@ -45,9 +61,10 @@ export const useAccountStore = create<AccountState>((set, get) => ({
 
       set({ accounts, activeAccount: active, isLoading: false });
 
-      if (active) {
-        await AsyncStorage.setItem(SELECTED_ACCOUNT_KEY, active._id);
-      }
+      await Promise.all([
+        AsyncStorage.setItem(CACHED_ACCOUNTS_KEY, JSON.stringify(accounts)),
+        active ? AsyncStorage.setItem(SELECTED_ACCOUNT_KEY, active._id) : Promise.resolve(),
+      ]);
     } catch (err: any) {
       set({ isLoading: false, error: err?.message || 'Failed to fetch accounts' });
     }

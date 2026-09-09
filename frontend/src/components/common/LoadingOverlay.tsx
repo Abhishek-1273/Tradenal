@@ -27,7 +27,7 @@ export const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
         },
       ]}
     >
-      <ActivityIndicator size="large" color={colors.primary} />
+      <ActivityIndicator size="large" color={colors.textPrimary} />
       {message && (
         <Text
           style={[
@@ -53,7 +53,7 @@ export const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
 
   return (
     <View style={styles.inline}>
-      <ActivityIndicator size="large" color={colors.primary} />
+      <ActivityIndicator size="large" color={colors.textPrimary} />
       {message && (
         <Text style={[typography.bodySm, { color: colors.textSecondary, marginTop: 8 }]}>
           {message}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, Alert, Image,
@@ -18,9 +18,19 @@ import { useTrade, useUpdateTrade } from '../../hooks/useTrades';
 import { Input } from '../../components/common/Input';
 import { Button } from '../../components/common/Button';
 import { SelectPills, CheckRow } from '../../components/common/SelectPills';
+import { CascadingSetupSelector } from '../../components/trade/CascadingSetupSelector';
+import { DisciplineChecklist } from '../../components/trade/DisciplineChecklist';
+import { StructuredMistakesSelector } from '../../components/trade/StructuredMistakesSelector';
 import { RRCalculator } from '../../components/trade/RRCalculator';
+import { ExecutionGradeCard } from '../../components/trade/ExecutionGradeCard';
+import { GuidedTradeNotes } from '../../components/trade/GuidedTradeNotes';
+import { FinalActionBar } from '../../components/trade/FinalActionBar';
 import { LoadingOverlay } from '../../components/common/LoadingOverlay';
 import { tradeFormSchema, TradeFormData } from '../../utils/validators';
+import { useAccountStore } from '../../store/account.store';
+import { calculateRiskCapAudit } from '../../utils/riskCap';
+import { calculateExecutionGrade } from '../../utils/executionGrade';
+import { serializeTradeNotes, parseTradeNotes } from '../../utils/tradeNotes';
 import { combineDateAndTime } from '../../utils/formatters';
 import { getErrorMessage } from '../../api/client';
 import { useToast } from '../../components/common/Toast';
@@ -29,7 +39,7 @@ import { SESSIONS, SETUPS, RESULTS, EMOTIONS_BEFORE, EMOTIONS_DURING, EMOTIONS_A
 import dayjs from 'dayjs';
 
 export const EditTradeScreen: React.FC = () => {
-  const { colors, typography, spacing, radii } = useTheme();
+  const { colors, typography, spacing, radii, isDark } = useTheme();
   const navigation = useNavigation<AppNavProp>();
   const route = useRoute<EditTradeRouteProp>();
   const insets = useSafeAreaInsets();
@@ -136,7 +146,9 @@ export const EditTradeScreen: React.FC = () => {
       riskPercent: trade.riskPercent.toString(),
       pnlAmount: trade.pnlAmount?.toString() ?? '',
       session: trade.session,
+      strategy: trade.strategy,
       setup: trade.setup,
+      confluences: trade.confluences || [],
       customSetup: trade.customSetup ?? '',
       result: trade.result,
       emotionBefore: trade.emotionBefore,
@@ -154,16 +166,41 @@ export const EditTradeScreen: React.FC = () => {
       sizedCorrectly: trade.sizedCorrectly ?? true,
       withinDailyLossLimit: trade.withinDailyLossLimit ?? true,
       singleTradeDominance: trade.singleTradeDominance ?? true,
+      checklist: (trade.checklist && trade.checklist.length > 0)
+        ? trade.checklist
+        : [
+            ...(trade.followedPlan ? ['plan_followed'] : []),
+            ...(!trade.overtraded ? ['one_and_done'] : []),
+            ...(!trade.movedSL ? ['zero_sl_widening'] : []),
+            ...(!trade.revengeTrade ? ['not_revenge_trade'] : []),
+            ...(!trade.newsTrade ? ['news_window_clear'] : []),
+            ...(trade.checkedHigherTimeframe ? ['pre_market_routine'] : []),
+            ...(trade.waitedForConfirmation ? ['candle_close_confirmation'] : []),
+            ...(trade.sizedCorrectly !== false ? ['risk_cap'] : []),
+          ],
       mistakes: trade.mistakes as string[],
       customMistake: trade.customMistake ?? '',
       reasonForEntry: trade.reasonForEntry ?? '',
       notes: trade.notes ?? '',
+      keyTakeaway: trade.keyTakeaway ?? parseTradeNotes(trade.notes).keyTakeaway,
+      whatWentWell: trade.whatWentWell ?? parseTradeNotes(trade.notes).whatWentWell,
+      whatToImprove: trade.whatToImprove ?? parseTradeNotes(trade.notes).whatToImprove,
       tags: trade.tags,
       isFavorite: trade.isFavorite,
     } : undefined,
   });
 
-  const [ep, sl, tp, ex, tt, ls, rp] = watch(['entryPrice','stopLoss','takeProfit','exitPrice','tradeType','lotSize','riskPercent']);
+  const scrollViewRef = useRef<ScrollView>(null);
+  const checklistSectionY = useRef<number>(0);
+
+  const { activeAccount } = useAccountStore();
+  const [
+    ep, sl, tp, ex, tt, ls, rp, pnlValStr, checklistVal, mistakesVal,
+  ] = watch([
+    'entryPrice','stopLoss','takeProfit','exitPrice','tradeType','lotSize','riskPercent','pnlAmount','checklist','mistakes',
+  ]);
+  const riskAudit = calculateRiskCapAudit(activeAccount, rp, pnlValStr);
+  const gradeResult = calculateExecutionGrade(checklistVal, mistakesVal, isDark);
 
   const onInvalid = (formErrors: any) => {
     const errorKeys = Object.keys(formErrors);
@@ -176,6 +213,22 @@ export const EditTradeScreen: React.FC = () => {
 
   const onSubmit = async (data: TradeFormData) => {
     try {
+      let pnlVal = data.pnlAmount ? parseFloat(data.pnlAmount) : undefined;
+      if (pnlVal !== undefined && !isNaN(pnlVal)) {
+        if (data.result === 'loss' && pnlVal > 0) pnlVal = -pnlVal;
+        if ((data.result === 'win' || data.result === 'partialWin') && pnlVal < 0) pnlVal = Math.abs(pnlVal);
+        if (data.result === 'breakeven') pnlVal = 0;
+      }
+
+      const compiledNotes = serializeTradeNotes(
+        {
+          keyTakeaway: data.keyTakeaway,
+          whatWentWell: data.whatWentWell,
+          whatToImprove: data.whatToImprove,
+        },
+        data.notes
+      );
+
       await updateTrade({
         pair: data.pair, tradeType: data.tradeType, tradeDate: data.tradeDate,
         entryTime: combineDateAndTime(data.tradeDate, data.entryTime),
@@ -185,20 +238,34 @@ export const EditTradeScreen: React.FC = () => {
         takeProfit: data.takeProfit ? parseFloat(data.takeProfit) : undefined,
         exitPrice: data.exitPrice ? parseFloat(data.exitPrice) : undefined,
         lotSize: parseFloat(data.lotSize), riskPercent: parseFloat(data.riskPercent),
-        pnlAmount: data.pnlAmount ? parseFloat(data.pnlAmount) : undefined,
-        session: data.session, setup: data.setup, customSetup: data.customSetup,
+        pnlAmount: pnlVal,
+        session: data.session,
+        strategy: data.strategy,
+        setup: data.setup === 'custom' && data.customSetup ? data.customSetup.trim() : data.setup,
+        confluences: data.confluences,
+        customSetup: data.customSetup,
         result: data.result, emotionBefore: data.emotionBefore,
         emotionDuring: data.emotionDuring, emotionAfter: data.emotionAfter,
         confluenceCount: data.confluenceCount,
-        followedPlan: data.followedPlan, overtraded: data.overtraded, movedSL: data.movedSL,
-        movedTP: data.movedTP, revengeTrade: data.revengeTrade, newsTrade: data.newsTrade,
-        checkedHigherTimeframe: data.checkedHigherTimeframe,
-        waitedForConfirmation: data.waitedForConfirmation,
-        sizedCorrectly: data.sizedCorrectly,
-        withinDailyLossLimit: data.withinDailyLossLimit,
-        singleTradeDominance: data.singleTradeDominance,
+        checklist: data.checklist || [],
+        followedPlan: data.checklist ? data.checklist.includes('plan_followed') : data.followedPlan,
+        overtraded: data.checklist ? !data.checklist.includes('one_and_done') : data.overtraded,
+        movedSL: data.checklist ? !data.checklist.includes('zero_sl_widening') : data.movedSL,
+        movedTP: data.movedTP,
+        revengeTrade: data.checklist ? !data.checklist.includes('not_revenge_trade') : data.revengeTrade,
+        newsTrade: data.checklist ? !data.checklist.includes('news_window_clear') : data.newsTrade,
+        checkedHigherTimeframe: data.checklist ? data.checklist.includes('pre_market_routine') : data.checkedHigherTimeframe,
+        waitedForConfirmation: data.checklist ? data.checklist.includes('candle_close_confirmation') : data.waitedForConfirmation,
+        sizedCorrectly: data.checklist ? data.checklist.includes('risk_cap') : data.sizedCorrectly,
+        withinDailyLossLimit: data.checklist ? data.checklist.includes('risk_cap') : data.withinDailyLossLimit,
+        singleTradeDominance: data.checklist ? data.checklist.includes('one_and_done') : data.singleTradeDominance,
         mistakes: data.mistakes as any[], customMistake: data.customMistake,
-        reasonForEntry: data.reasonForEntry, notes: data.notes, tags: data.tags, isFavorite: data.isFavorite,
+        reasonForEntry: data.reasonForEntry,
+        notes: compiledNotes || data.notes,
+        keyTakeaway: data.keyTakeaway,
+        whatWentWell: data.whatWentWell,
+        whatToImprove: data.whatToImprove,
+        tags: data.tags, isFavorite: data.isFavorite,
       });
 
       // Upload new local images if selected
@@ -245,7 +312,7 @@ export const EditTradeScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={[{ paddingHorizontal: spacing[5], paddingTop: spacing[4], paddingBottom: insets.bottom + 40 }]}>
+        <ScrollView ref={scrollViewRef} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={[{ paddingHorizontal: spacing[5], paddingTop: spacing[4], paddingBottom: insets.bottom + 40 }]}>
           <RRCalculator tradeType={tt as any} entryPrice={ep} stopLoss={sl} takeProfit={tp} exitPrice={ex} lotSize={ls} riskPercent={rp} />
 
           <Controller control={control} name="pair" render={({ field: { onChange, value } }) => (
@@ -296,52 +363,336 @@ export const EditTradeScreen: React.FC = () => {
             )} />
           </View>
 
-          <Controller control={control} name="pnlAmount" render={({ field: { onChange, value } }) => (
-            <Input
-              label="PnL Amount"
-              placeholder="e.g. 150.00 or -50.00 (Optional)"
-              value={value}
-              onChangeText={onChange}
-              error={errors.pnlAmount?.message}
-              keyboardType="numeric"
+          {/* Dynamic ≤ 1% Account Risk Cap Helper */}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 6,
+              backgroundColor: riskAudit.isViolated
+                ? 'rgba(239, 68, 68, 0.10)'
+                : 'rgba(16, 185, 129, 0.08)',
+              borderColor: riskAudit.isViolated ? 'rgba(239, 68, 68, 0.35)' : 'rgba(16, 185, 129, 0.25)',
+              borderWidth: 1,
+              borderRadius: radii.sm,
+              paddingVertical: 7,
+              paddingHorizontal: 10,
+              marginBottom: spacing[3],
+            }}
+          >
+            <Ionicons
+              name={riskAudit.isViolated ? 'alert-circle' : 'shield-checkmark'}
+              size={15}
+              color={riskAudit.isViolated ? '#EF4444' : '#10B981'}
             />
-          )} />
+            <Text
+              style={{
+                fontSize: 11.5,
+                fontWeight: '600',
+                color: riskAudit.isViolated ? '#EF4444' : colors.textSecondary,
+                flex: 1,
+              }}
+            >
+              {riskAudit.isViolated
+                ? `⚠️ VIOLATION: ${riskAudit.violationReason}`
+                : `≤ 1% Account Risk Cap: Max ${riskAudit.currencySymbol}${riskAudit.maxOnePercentRisk.toFixed(0)} on ${riskAudit.currencySymbol}${riskAudit.accountBalance.toLocaleString()} starting balance.`}
+            </Text>
+          </View>
+
+          <Controller control={control} name="pnlAmount" render={({ field: { onChange, value } }) => {
+            const currentStr = value || '';
+            const isNegative = currentStr.startsWith('-');
+            const handleToggleSign = (makeNegative: boolean) => {
+              const clean = currentStr.replace(/^-/, '');
+              if (!clean) {
+                onChange(makeNegative ? '-' : '');
+              } else {
+                onChange(makeNegative ? `-${clean}` : clean);
+              }
+            };
+            return (
+              <View style={{ marginBottom: spacing[3] }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing[1.5] }}>
+                  <Text style={[typography.label, { color: colors.textSecondary }]}>
+                    PnL Amount
+                  </Text>
+                  <View style={{ flexDirection: 'row', gap: 6 }}>
+                    <TouchableOpacity
+                      onPress={() => handleToggleSign(false)}
+                      activeOpacity={0.8}
+                      style={{
+                        paddingHorizontal: 10,
+                        paddingVertical: 3,
+                        borderRadius: 6,
+                        backgroundColor: !isNegative && currentStr ? colors.successSubtle : colors.surfaceElevated,
+                        borderColor: !isNegative && currentStr ? colors.success : colors.border,
+                        borderWidth: 1,
+                      }}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: !isNegative && currentStr ? colors.success : colors.textTertiary }}>
+                        + Profit
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => handleToggleSign(true)}
+                      activeOpacity={0.8}
+                      style={{
+                        paddingHorizontal: 10,
+                        paddingVertical: 3,
+                        borderRadius: 6,
+                        backgroundColor: isNegative ? colors.errorSubtle : colors.surfaceElevated,
+                        borderColor: isNegative ? colors.error : colors.border,
+                        borderWidth: 1,
+                      }}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: isNegative ? colors.error : colors.textTertiary }}>
+                        - Loss
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+                <Input
+                  placeholder={isNegative ? "-50.00" : "150.00 (Optional)"}
+                  value={value}
+                  onChangeText={onChange}
+                  error={errors.pnlAmount?.message}
+                  keyboardType="decimal-pad"
+                />
+              </View>
+            );
+          }} />
 
           <Controller control={control} name="session" render={({ field: { onChange, value } }) => (
             <SelectPills label="Session" required options={SESSIONS} value={value} onChange={onChange} columns={2} style={{ marginBottom: spacing[4] }} />
           )} />
-          <Controller control={control} name="setup" render={({ field: { onChange, value } }) => (
-            <SelectPills label="Setup" options={SETUPS} value={value} onChange={onChange} columns={3} style={{ marginBottom: spacing[4] }} />
-          )} />
+          <Controller
+            control={control}
+            name="strategy"
+            render={({ field: { onChange: onStrategyChange, value: selectedStrategy } }) => (
+              <Controller
+                control={control}
+                name="setup"
+                render={({ field: { onChange: onSetupChange, value: selectedSetup } }) => (
+                  <Controller
+                    control={control}
+                    name="confluences"
+                    render={({ field: { onChange: onConfluencesChange, value: selectedConfluences } }) => (
+                      <Controller
+                        control={control}
+                        name="customSetup"
+                        render={({ field: { onChange: onCustomSetupChange, value: customSetupText } }) => (
+                          <CascadingSetupSelector
+                            selectedStrategy={selectedStrategy}
+                            selectedSetup={selectedSetup}
+                            selectedConfluences={selectedConfluences}
+                            customSetupText={customSetupText}
+                            onStrategyChange={onStrategyChange}
+                            onSetupChange={onSetupChange}
+                            onConfluencesChange={onConfluencesChange}
+                            onCustomSetupChange={onCustomSetupChange}
+                          />
+                        )}
+                      />
+                    )}
+                  />
+                )}
+              />
+            )}
+          />
           <Controller control={control} name="result" render={({ field: { onChange, value } }) => (
             <SelectPills label="Result" required options={RESULTS.map((r) => ({ ...r }))} value={value} onChange={onChange} columns={2} style={{ marginBottom: spacing[4] }} />
           )} />
           <Controller control={control} name="emotionBefore" render={({ field: { onChange, value } }) => (
-            <SelectPills label="Emotion Before" options={EMOTIONS_BEFORE} value={value} onChange={onChange} columns={3} style={{ marginBottom: spacing[4] }} />
+            <SelectPills label="Emotion Before" options={EMOTIONS_BEFORE} value={value} onChange={onChange} columns={2} style={{ marginBottom: spacing[4] }} />
+          )} />
+          <Controller control={control} name="emotionDuring" render={({ field: { onChange, value } }) => (
+            <SelectPills label="Emotion During" options={EMOTIONS_DURING} value={value} onChange={onChange} columns={2} style={{ marginBottom: spacing[4] }} />
           )} />
           <Controller control={control} name="emotionAfter" render={({ field: { onChange, value } }) => (
-            <SelectPills label="Emotion After" options={EMOTIONS_AFTER} value={value} onChange={onChange} columns={3} style={{ marginBottom: spacing[4] }} />
+            <SelectPills label="Emotion After" options={EMOTIONS_AFTER} value={value} onChange={onChange} columns={2} style={{ marginBottom: spacing[4] }} />
           )} />
 
-          {[
-            { name: 'followedPlan' as const, label: 'Followed Plan?', warn: false },
-            { name: 'revengeTrade' as const, label: 'Revenge Trade?', warn: true },
-            { name: 'overtraded' as const, label: 'Overtraded?', warn: true },
-            { name: 'movedSL' as const, label: 'Moved Stop Loss?', warn: true },
-            { name: 'newsTrade' as const, label: 'News Trade?', warn: false },
-          ].map((item) => (
-            <Controller key={item.name} control={control} name={item.name} render={({ field: { onChange, value } }) => (
-              <CheckRow label={item.label} value={value as boolean} onChange={onChange} warnWhenOn={item.warn} />
-            )} />
-          ))}
+          <View
+            style={{ marginBottom: spacing[4] }}
+            onLayout={(e) => { checklistSectionY.current = e.nativeEvent.layout.y; }}
+          >
+            <Text style={[typography.label, { color: colors.textSecondary, marginBottom: spacing[2] }]}>
+              Discipline Checklist
+            </Text>
+            <Controller
+              control={control}
+              name="checklist"
+              render={({ field: { onChange, value } }) => (
+                <DisciplineChecklist value={value || []} onChange={onChange} />
+              )}
+            />
+          </View>
 
-          <Controller control={control} name="mistakes" render={({ field: { onChange, value } }) => (
-            <SelectPills label="Mistakes" options={MISTAKES} value={undefined} onChange={() => {}} multiSelect selectedValues={value} onMultiChange={onChange} columns={2} style={{ marginTop: spacing[4], marginBottom: spacing[4] }} />
-          )} />
+          <Controller
+            control={control}
+            name="mistakes"
+            render={({ field: { onChange: onMistakesChange, value: mistakesValue } }) => (
+              <Controller
+                control={control}
+                name="customMistake"
+                render={({ field: { onChange: onCustomChange, value: customVal } }) => (
+                  <View style={{ marginBottom: spacing[4] }}>
+                    <Text style={[typography.label, { color: colors.textSecondary, marginBottom: spacing[2.5] }]}>
+                      Mistakes & Execution Errors
+                    </Text>
+                    <StructuredMistakesSelector
+                      value={mistakesValue || []}
+                      onChange={onMistakesChange}
+                      customMistake={customVal || ''}
+                      onCustomMistakeChange={onCustomChange}
+                    />
+                  </View>
+                )}
+              />
+            )}
+          />
 
-          <Controller control={control} name="notes" render={({ field: { onChange, value } }) => (
-            <Input label="Notes" placeholder="Trade notes..." value={value} onChangeText={onChange} multiline numberOfLines={5} style={{ height: 120, textAlignVertical: 'top', paddingTop: 12 }} />
-          )} />
+          {/* ── Guided Trade Notes & Post-Mortem (Structured Reflection) ── */}
+          <Controller
+            control={control}
+            name="keyTakeaway"
+            render={({ field: { onChange: onKeyChange, value: keyValue } }) => (
+              <Controller
+                control={control}
+                name="whatWentWell"
+                render={({ field: { onChange: onWellChange, value: wellValue } }) => (
+                  <Controller
+                    control={control}
+                    name="whatToImprove"
+                    render={({ field: { onChange: onImproveChange, value: improveValue } }) => (
+                      <GuidedTradeNotes
+                        keyTakeaway={keyValue || ''}
+                        whatWentWell={wellValue || ''}
+                        whatToImprove={improveValue || ''}
+                        onKeyTakeawayChange={onKeyChange}
+                        onWhatWentWellChange={onWellChange}
+                        onWhatToImproveChange={onImproveChange}
+                        style={{ marginTop: spacing[2] }}
+                      />
+                    )}
+                  />
+                )}
+              />
+            )}
+          />
+
+          {/* ── Deterministic Locked Execution Grade Card ── */}
+          <ExecutionGradeCard
+            checklist={checklistVal}
+            mistakes={mistakesVal}
+            onNavigateToTab={() => scrollViewRef.current?.scrollTo({ y: Math.max(0, checklistSectionY.current - 20), animated: true })}
+            style={{ marginBottom: spacing[3], marginTop: spacing[2] }}
+          />
+
+          {/* ── Dynamic ≤ 1% Account Risk Cap Audit ── */}
+          <View
+            style={{
+              backgroundColor: riskAudit.isViolated
+                ? isDark ? 'rgba(239, 68, 68, 0.12)' : '#FEF2F2'
+                : isDark ? 'rgba(16, 185, 129, 0.08)' : '#F0FDF4',
+              borderColor: riskAudit.isViolated ? '#EF4444' : 'rgba(16, 185, 129, 0.3)',
+              borderWidth: 1.5,
+              borderRadius: radii.lg,
+              padding: spacing[3.5],
+              marginTop: spacing[2],
+              marginBottom: spacing[4],
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Ionicons
+                  name={riskAudit.isViolated ? 'alert-circle' : 'shield-checkmark'}
+                  size={18}
+                  color={riskAudit.isViolated ? '#EF4444' : '#10B981'}
+                />
+                <Text style={[typography.labelSm, { color: colors.textPrimary, fontWeight: '700' }]}>
+                  ≤ 1% Account Risk Cap Audit
+                </Text>
+              </View>
+              <View
+                style={{
+                  paddingHorizontal: 8,
+                  paddingVertical: 2.5,
+                  borderRadius: 6,
+                  backgroundColor: riskAudit.isViolated ? 'rgba(239, 68, 68, 0.18)' : 'rgba(16, 185, 129, 0.18)',
+                  borderColor: riskAudit.isViolated ? '#EF4444' : '#10B981',
+                  borderWidth: 1,
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 10.5,
+                    fontWeight: '800',
+                    color: riskAudit.isViolated ? '#EF4444' : '#10B981',
+                  }}
+                >
+                  {riskAudit.isViolated ? 'CAP VIOLATED' : 'CAP RESPECTED'}
+                </Text>
+              </View>
+            </View>
+
+            {/* Metric Strip */}
+            <View style={{ flexDirection: 'row', gap: 12, marginTop: 4, marginBottom: 6 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={[typography.caption, { color: colors.textTertiary, fontSize: 10.5 }]}>STARTING BAL</Text>
+                <Text style={{ fontSize: 12.5, fontWeight: '700', color: colors.textPrimary }}>
+                  {riskAudit.currencySymbol}{riskAudit.accountBalance.toLocaleString()}
+                </Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[typography.caption, { color: colors.textTertiary, fontSize: 10.5 }]}>1% CAP LIMIT</Text>
+                <Text style={{ fontSize: 12.5, fontWeight: '700', color: colors.textPrimary }}>
+                  {riskAudit.currencySymbol}{riskAudit.maxOnePercentRisk.toFixed(0)}
+                </Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[typography.caption, { color: colors.textTertiary, fontSize: 10.5 }]}>PLANNED RISK</Text>
+                <Text style={{ fontSize: 12.5, fontWeight: '700', color: riskAudit.plannedRiskPercent > 1.0 ? '#EF4444' : colors.textPrimary }}>
+                  {riskAudit.plannedRiskPercent.toFixed(1)}% ({riskAudit.currencySymbol}{riskAudit.plannedRiskAmount.toFixed(0)})
+                </Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[typography.caption, { color: colors.textTertiary, fontSize: 10.5 }]}>REALIZED PNL</Text>
+                <Text
+                  style={{
+                    fontSize: 12.5,
+                    fontWeight: '700',
+                    color: riskAudit.realizedPnL !== undefined
+                      ? riskAudit.realizedPnL >= 0
+                        ? colors.success
+                        : riskAudit.realizedPnL < -riskAudit.maxOnePercentRisk
+                        ? colors.error
+                        : colors.textPrimary
+                      : colors.textTertiary,
+                  }}
+                >
+                  {riskAudit.realizedPnL !== undefined
+                    ? `${riskAudit.realizedPnL >= 0 ? '+' : ''}${riskAudit.currencySymbol}${riskAudit.realizedPnL.toFixed(2)}`
+                    : 'Open'}
+                </Text>
+              </View>
+            </View>
+
+            <Text
+              style={[
+                typography.caption,
+                {
+                  color: riskAudit.isViolated ? (isDark ? '#FCA5A5' : '#B91C1C') : colors.textSecondary,
+                  fontSize: 11,
+                  lineHeight: 15,
+                },
+              ]}
+            >
+              {riskAudit.isViolated
+                ? `🚨 ${riskAudit.violationReason} Make sure this risk breach is recorded in your trade review.`
+                : `🛡️ Position sizing is disciplined and strictly within your ≤ 1% (${riskAudit.currencySymbol}${riskAudit.maxOnePercentRisk.toFixed(0)}) capital protection limit.`}
+            </Text>
+          </View>
 
           {/* Screenshots Editor */}
           <View style={{ marginBottom: spacing[4], marginTop: spacing[2] }}>
@@ -424,8 +775,18 @@ export const EditTradeScreen: React.FC = () => {
             </View>
           </View>
 
-          <Button label="Save Changes" onPress={handleSubmit(onSubmit, onInvalid)} loading={isPending} style={{ marginTop: spacing[4] }} />
         </ScrollView>
+
+        <FinalActionBar
+          onBack={() => navigation.goBack()}
+          onSubmit={handleSubmit(onSubmit, onInvalid)}
+          isPending={isPending}
+          submitLabel="Update Trade"
+          backLabel="Cancel"
+          gradeBadge={gradeResult.badgeText}
+          gradeColor={gradeResult.color}
+          isRiskBreached={riskAudit.isViolated}
+        />
       </View>
 
       <ImageViewerModal

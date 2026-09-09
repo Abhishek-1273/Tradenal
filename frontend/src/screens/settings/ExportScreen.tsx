@@ -29,7 +29,7 @@ type ExportFormat = 'csv' | 'json';
 type DatePreset = 'all' | '30days' | '90days' | 'custom';
 
 export const ExportScreen: React.FC = () => {
-  const { colors, typography, spacing, radii } = useTheme();
+  const { colors, typography, spacing, radii, isDark } = useTheme();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { activeAccount } = useAccountStore();
@@ -130,22 +130,31 @@ export const ExportScreen: React.FC = () => {
         {/* ── FORMAT SELECT ── */}
         <Text style={[typography.labelSm, { color: colors.textTertiary, marginBottom: spacing[2] }]}>EXPORT FORMAT</Text>
         <Card style={{ marginBottom: spacing[5] }}>
-          <View style={styles.segmentContainer}>
+          <View style={[styles.segmentContainer, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)' }]}>
             {(['csv', 'json'] as const).map((f) => {
               const active = format === f;
+              const iconName = f === 'csv' ? 'document-text-outline' : 'code-slash-outline';
               return (
                 <TouchableOpacity
                   key={f}
                   onPress={() => setFormat(f)}
+                  activeOpacity={0.8}
                   style={[
                     styles.segmentButton,
                     {
-                      backgroundColor: active ? colors.primary : 'transparent',
+                      backgroundColor: active ? (isDark ? '#FFFFFF' : '#0F172A') : 'transparent',
                       borderRadius: radii.md,
+                      flexDirection: 'row',
+                      gap: 6,
                     },
                   ]}
                 >
-                  <Text style={[typography.label, { color: active ? '#fff' : colors.textSecondary, textTransform: 'uppercase' }]}>
+                  <Ionicons
+                    name={iconName}
+                    size={16}
+                    color={active ? (isDark ? '#0F172A' : '#FFFFFF') : colors.textSecondary}
+                  />
+                  <Text style={[typography.label, { color: active ? (isDark ? '#0F172A' : '#FFFFFF') : colors.textSecondary, textTransform: 'uppercase', fontWeight: active ? '700' : '500' }]}>
                     {f}
                   </Text>
                 </TouchableOpacity>
@@ -170,7 +179,7 @@ export const ExportScreen: React.FC = () => {
               value={scopeActiveOnly}
               onValueChange={setScopeActiveOnly}
               trackColor={{ false: colors.border, true: colors.primary }}
-              thumbColor="#fff"
+              thumbColor={isDark ? '#000000' : '#FFFFFF'}
             />
           </View>
         </Card>
@@ -178,7 +187,7 @@ export const ExportScreen: React.FC = () => {
         {/* ── TIMEFRAME SELECT ── */}
         <Text style={[typography.labelSm, { color: colors.textTertiary, marginBottom: spacing[2] }]}>TIMEFRAME</Text>
         <Card style={{ marginBottom: spacing[5] }}>
-          <View style={styles.segmentContainer}>
+          <View style={[styles.segmentContainer, { backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)' }]}>
             {([
               { label: 'All', value: 'all' },
               { label: '30 Days', value: '30days' },
@@ -190,16 +199,17 @@ export const ExportScreen: React.FC = () => {
                 <TouchableOpacity
                   key={p.value}
                   onPress={() => setPreset(p.value)}
+                  activeOpacity={0.8}
                   style={[
                     styles.segmentButton,
                     {
-                      backgroundColor: active ? colors.primary : 'transparent',
+                      backgroundColor: active ? (isDark ? '#FFFFFF' : '#0F172A') : 'transparent',
                       borderRadius: radii.md,
                       paddingVertical: 10,
                     },
                   ]}
                 >
-                  <Text style={[typography.label, { color: active ? '#fff' : colors.textSecondary }]}>
+                  <Text style={[typography.label, { color: active ? (isDark ? '#0F172A' : '#FFFFFF') : colors.textSecondary, fontWeight: active ? '700' : '500' }]}>
                     {p.label}
                   </Text>
                 </TouchableOpacity>
@@ -228,7 +238,7 @@ export const ExportScreen: React.FC = () => {
           label={loading ? 'Generating Export...' : `Export to ${format.toUpperCase()}`}
           onPress={handleExport}
           loading={loading}
-          icon={loading ? undefined : <Ionicons name="download-outline" size={18} color="#fff" />}
+          icon={loading ? undefined : <Ionicons name="download-outline" size={18} color={isDark ? '#0F172A' : '#FFFFFF'} />}
           style={{ marginTop: spacing[2] }}
         />
       </ScrollView>

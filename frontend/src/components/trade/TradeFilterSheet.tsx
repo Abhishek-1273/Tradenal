@@ -265,10 +265,10 @@ export const TradeFilterSheet: React.FC<Props> = ({
               style={[
                 styles.toggleRow,
                 {
-                  backgroundColor: draft.isFavorite === 'true' ? colors.primarySubtle : colors.surfaceElevated,
+                  backgroundColor: draft.isFavorite === 'true' ? colors.surfaceHighlight : colors.surfaceElevated,
                   borderRadius: radii.lg,
                   padding: spacing[3],
-                  borderColor: draft.isFavorite === 'true' ? colors.primary : colors.border,
+                  borderColor: draft.isFavorite === 'true' ? colors.textSecondary : colors.border,
                   borderWidth: 1,
                 },
               ]}
@@ -276,10 +276,10 @@ export const TradeFilterSheet: React.FC<Props> = ({
               <Ionicons
                 name={draft.isFavorite === 'true' ? 'bookmark' : 'bookmark-outline'}
                 size={18}
-                color={draft.isFavorite === 'true' ? colors.primary : colors.textSecondary}
+                color={draft.isFavorite === 'true' ? colors.textPrimary : colors.textSecondary}
               />
               <Text
-                style={[typography.body, { color: draft.isFavorite === 'true' ? colors.primary : colors.textSecondary, marginLeft: spacing[2] }]}
+                style={[typography.body, { color: draft.isFavorite === 'true' ? colors.textPrimary : colors.textSecondary, marginLeft: spacing[2] }]}
               >
                 Favorites Only
               </Text>
@@ -311,9 +311,9 @@ export const TradeFilterSheet: React.FC<Props> = ({
 
           <TouchableOpacity
             onPress={handleApply}
-            style={[styles.footerBtn, styles.footerBtnPrimary, { backgroundColor: colors.primary, borderRadius: radii.lg, flex: 2, marginLeft: spacing[3] }]}
+            style={[styles.footerBtn, styles.footerBtnPrimary, { backgroundColor: colors.textPrimary, borderRadius: radii.lg, flex: 2, marginLeft: spacing[3] }]}
           >
-            <Text style={[typography.label, { color: '#fff' }]}>
+            <Text style={[typography.label, { color: colors.background }]}>
               Apply{activeCount > 0 ? ` (${activeCount})` : ''}
             </Text>
           </TouchableOpacity>
@@ -354,18 +354,18 @@ const ChipItem: React.FC<{
     style={[
       styles.chip,
       {
-        backgroundColor: active ? colors.primary : colors.surfaceElevated,
+        backgroundColor: active ? colors.textPrimary : colors.surfaceElevated,
         borderRadius: radii.full,
         paddingHorizontal: spacing[3],
         paddingVertical: spacing[1.5],
         marginRight: spacing[2],
         marginBottom: spacing[2],
-        borderColor: active ? colors.primary : colors.border,
+        borderColor: active ? colors.textPrimary : colors.border,
         borderWidth: 1,
       },
     ]}
   >
-    <Text style={[typography.labelSm, { color: active ? '#fff' : colors.textSecondary }]}>
+    <Text style={[typography.labelSm, { color: active ? colors.background : colors.textSecondary }]}>
       {label}
     </Text>
   </TouchableOpacity>

@@ -1,17 +1,29 @@
 import axios, { AxiosInstance, AxiosRequestConfig, InternalAxiosRequestConfig } from 'axios';
 import { storage } from '../utils/storage';
 
-// ── Backend URL config ───────────────────────────────────────────────────
-// USE_LOCAL = true  → local backend at LOCAL_IP:LOCAL_PORT
-// USE_LOCAL = false → Render-hosted backend
-const USE_LOCAL = false;
+import { Platform, NativeModules } from 'react-native';
 
-const LOCAL_IP = '192.168.1.105';
+// ── Backend URL config ───────────────────────────────────────────────────
+const PROD_API_URL = 'https://tradenal.onrender.com/api';
+const DEFAULT_LOCAL_IP = '192.168.1.100';
 const LOCAL_PORT = 5000;
 
-export const BASE_URL = USE_LOCAL
-  ? `http://${LOCAL_IP}:${LOCAL_PORT}/api`
-  : 'https://tradenal.onrender.com/api';
+const getDevApiUrl = (): string => {
+  try {
+    const scriptURL: string = NativeModules?.SourceCode?.scriptURL || '';
+    const match = scriptURL.match(/^https?:\/\/([^:/]+)/);
+    if (match && match[1] && match[1] !== 'localhost') {
+      return `http://${match[1]}:${LOCAL_PORT}/api`;
+    }
+  } catch {
+    // fallback
+  }
+  return `http://${DEFAULT_LOCAL_IP}:${LOCAL_PORT}/api`;
+};
+
+export const BASE_URL =
+  process.env.EXPO_PUBLIC_API_URL ||
+  (typeof __DEV__ !== 'undefined' && __DEV__ ? getDevApiUrl() : PROD_API_URL);
 
 let isRefreshing = false;
 let failedQueue: Array<{
@@ -54,7 +66,15 @@ const createApiClient = (): AxiosInstance => {
     async (error) => {
       const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean };
 
-      if (error.response?.status === 401 && !originalRequest._retry) {
+      // Never intercept 401 on auth endpoints (login, register, refresh, forgot/reset-password)
+      const isAuthEndpoint =
+        originalRequest.url?.includes('/auth/login') ||
+        originalRequest.url?.includes('/auth/register') ||
+        originalRequest.url?.includes('/auth/refresh') ||
+        originalRequest.url?.includes('/auth/forgot-password') ||
+        originalRequest.url?.includes('/auth/reset-password');
+
+      if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
         if (isRefreshing) {
           return new Promise((resolve, reject) => {
             failedQueue.push({ resolve, reject });
@@ -73,7 +93,11 @@ const createApiClient = (): AxiosInstance => {
 
         try {
           const refreshToken = await storage.getRefreshToken();
-          if (!refreshToken) throw new Error('No refresh token');
+          if (!refreshToken) {
+            processQueue(new Error('Session expired'), null);
+            await storage.clearAll();
+            return Promise.reject(new Error('Session expired. Please log in again.'));
+          }
 
           const response = await axios.post(`${BASE_URL}/auth/refresh`, { refreshToken });
           const { accessToken, refreshToken: newRefreshToken } = response.data.data;
@@ -109,6 +133,12 @@ export const apiClient = createApiClient();
 // Helper to extract error message from axios errors
 export const getErrorMessage = (error: unknown): string => {
   if (axios.isAxiosError(error)) {
+    if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+      return 'Request timed out. Please check if the backend server is running and reachable.';
+    }
+    if (error.code === 'ERR_NETWORK' || error.message?.includes('Network Error')) {
+      return `Cannot reach server at ${BASE_URL}. Ensure your phone and computer are on the same Wi-Fi network and firewall allows port 5000.`;
+    }
     const data = error.response?.data;
     if (Array.isArray(data?.errors) && data.errors.length > 0) {
       const first = data.errors[0];

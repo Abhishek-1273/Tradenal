@@ -71,7 +71,7 @@ export const StepNavigationBar: React.FC<StepNavigationBarProps> = ({
           styles.nextBtn,
           {
             borderRadius: radii.lg,
-            backgroundColor: colors.primary,
+            backgroundColor: colors.textPrimary,
             marginLeft: spacing[3],
             paddingHorizontal: spacing[4],
             opacity: loading ? 0.7 : 1,
@@ -79,20 +79,20 @@ export const StepNavigationBar: React.FC<StepNavigationBarProps> = ({
         ]}
       >
         {loading ? (
-          <ActivityIndicator size="small" color="#fff" />
+          <ActivityIndicator size="small" color={colors.background} />
         ) : (
           <>
             <Text
               numberOfLines={1}
               ellipsizeMode="clip"
-              style={[typography.label, { color: '#fff', fontWeight: '700', flexShrink: 1 }]}
+              style={[typography.label, { color: colors.background, fontWeight: '700', flexShrink: 1 }]}
             >
               {nextLabel}
             </Text>
             <Ionicons
               name={nextIcon === 'check' ? 'checkmark' : 'chevron-forward'}
               size={17}
-              color="#fff"
+              color={colors.background}
               style={{ marginLeft: 6 }}
             />
           </>

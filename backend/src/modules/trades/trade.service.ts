@@ -24,14 +24,31 @@ class TradeService {
         ? calculateRiskReward(input.entryPrice, input.stopLoss, input.takeProfit)
         : undefined;
 
-    const pnl = input.exitPrice
-      ? calculatePnL(input.tradeType, input.entryPrice, input.exitPrice, input.lotSize)
-      : undefined;
+    let finalPnL = input.pnlAmount;
+    if (finalPnL === undefined && input.exitPrice) {
+      finalPnL = calculatePnL(input.tradeType, input.entryPrice, input.exitPrice, input.lotSize, input.pair);
+    }
+    if (finalPnL !== undefined) {
+      if (input.result === 'loss' && finalPnL > 0) finalPnL = -finalPnL;
+      if ((input.result === 'win' || input.result === 'partialWin') && finalPnL < 0) finalPnL = Math.abs(finalPnL);
+      if (input.result === 'breakeven') finalPnL = 0;
+    }
 
-    const rMultiple =
-      input.exitPrice && input.stopLoss != null
+    let rMultiple =
+      input.exitPrice && input.stopLoss != null && Number(input.stopLoss) > 0
         ? calculateRMultiple(input.tradeType, input.entryPrice, input.stopLoss, input.exitPrice)
         : undefined;
+
+    // Fallback: If Stop Loss was not provided, assign default 1R based on trade outcome
+    if (rMultiple === undefined || (rMultiple === 0 && input.result !== 'breakeven')) {
+      if (input.result === 'loss' || (finalPnL !== undefined && finalPnL < 0)) {
+        rMultiple = -1.0;
+      } else if (input.result === 'win' || input.result === 'partialWin' || (finalPnL !== undefined && finalPnL > 0)) {
+        rMultiple = 1.0;
+      } else if (input.result === 'breakeven' || finalPnL === 0) {
+        rMultiple = 0;
+      }
+    }
 
     const tradeDurationMinutes =
       input.entryTime && input.exitTime
@@ -43,7 +60,8 @@ class TradeService {
       userId: userId as unknown as mongoose.Types.ObjectId,
       ...(accountId ? { accountId: accountId as unknown as mongoose.Types.ObjectId } : {}),
       riskReward,
-      pnl,
+      pnl: finalPnL,
+      pnlAmount: finalPnL,
       rMultiple,
       tradeDurationMinutes,
     } as Partial<ITrade>);
@@ -70,6 +88,7 @@ class TradeService {
       pair: filtersInput.pair,
       result: filtersInput.result,
       session: filtersInput.session,
+      strategy: filtersInput.strategy,
       setup: filtersInput.setup,
       emotionBefore: filtersInput.emotionBefore,
       startDate: filtersInput.startDate,
@@ -128,16 +147,38 @@ class TradeService {
     const entryTime = input.entryTime ?? trade.entryTime;
     const exitTime = input.exitTime ?? trade.exitTime;
 
+    const pair = input.pair ?? trade.pair;
+    const result = input.result ?? trade.result;
+
     if (stopLoss != null && takeProfit != null) {
       updates.riskReward = calculateRiskReward(entryPrice, stopLoss, takeProfit);
     } else {
       updates.riskReward = undefined;
     }
 
-    if (exitPrice) {
-      updates.pnl = calculatePnL(tradeType, entryPrice, exitPrice, lotSize);
-      if (stopLoss != null) {
-        updates.rMultiple = calculateRMultiple(tradeType, entryPrice, stopLoss, exitPrice);
+    let finalPnL = input.pnlAmount ?? trade.pnlAmount;
+    if (finalPnL === undefined && exitPrice) {
+      finalPnL = calculatePnL(tradeType, entryPrice, exitPrice, lotSize, pair);
+    }
+    if (finalPnL !== undefined) {
+      if (result === 'loss' && finalPnL > 0) finalPnL = -finalPnL;
+      if ((result === 'win' || result === 'partialWin') && finalPnL < 0) finalPnL = Math.abs(finalPnL);
+      if (result === 'breakeven') finalPnL = 0;
+      updates.pnl = finalPnL;
+      updates.pnlAmount = finalPnL;
+    }
+
+    if (exitPrice && stopLoss != null && Number(stopLoss) > 0) {
+      updates.rMultiple = calculateRMultiple(tradeType, entryPrice, stopLoss, exitPrice);
+    } else {
+      const pnlToCheck = finalPnL !== undefined ? finalPnL : trade.pnlAmount;
+      const resToCheck = result || trade.result;
+      if (resToCheck === 'loss' || (pnlToCheck !== undefined && pnlToCheck < 0)) {
+        updates.rMultiple = -1.0;
+      } else if (resToCheck === 'win' || resToCheck === 'partialWin' || (pnlToCheck !== undefined && pnlToCheck > 0)) {
+        updates.rMultiple = 1.0;
+      } else if (resToCheck === 'breakeven' || pnlToCheck === 0) {
+        updates.rMultiple = 0;
       }
     }
 

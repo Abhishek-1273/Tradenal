@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,42 +9,323 @@ import {
   Modal,
   ActivityIndicator,
   Platform,
+  TextInput,
+  Switch,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useQuery } from '@tanstack/react-query';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import dayjs from 'dayjs';
 import { useTheme } from '../../theme';
-import { useRecentGoals, useGoal, useCreateGoal, statsKeys } from '../../hooks/useTrades';
+import { statsKeys } from '../../hooks/useTrades';
 import { Card } from '../../components/common/Card';
 import { Button } from '../../components/common/Button';
 import { Input } from '../../components/common/Input';
-import { Skeleton } from '../../components/common/LoadingOverlay';
-import { GoalWithProgress, AccountStatus } from '../../types';
-import { formatPercent, getDisciplineScoreColor, formatPnL, formatBalance } from '../../utils/formatters';
+import { AccountStatus } from '../../types';
+import { formatPnL, formatBalance } from '../../utils/formatters';
 import { useAccountStore } from '../../store/account.store';
 import { useUpdateAccount } from '../../hooks/useAccounts';
 import { statsApi } from '../../api/stats.api';
 import { useToast } from '../../components/common/Toast';
 
-const CURRENT_MONTH = dayjs().format('YYYY-MM');
+// ─── Daily Rule Types ──────────────────────────────────────────────────────────
+export interface DailyRule {
+  id: string;
+  title: string;
+  description?: string;
+  category: 'risk' | 'psychology' | 'setup' | 'timing' | 'custom';
+  icon?: keyof typeof Ionicons.glyphMap;
+  color?: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+const RULES_STORAGE_KEY = '@tradenal_daily_rules';
+const RULES_LAST_DATE_KEY = '@tradenal_daily_rules_last_date';
+
+const RULE_CATEGORY_META: Record<DailyRule['category'], { icon: keyof typeof Ionicons.glyphMap; color: string; label: string }> = {
+  risk: { icon: 'shield-checkmark-outline', color: '#EF4444', label: 'Risk Management' },
+  psychology: { icon: 'bulb-outline', color: '#8B5CF6', label: 'Psychology' },
+  setup: { icon: 'layers-outline', color: '#3B82F6', label: 'Setup Quality' },
+  timing: { icon: 'time-outline', color: '#F59E0B', label: 'Timing' },
+  custom: { icon: 'create-outline', color: '#10B981', label: 'Custom' },
+};
+
+const PRESET_RULES: Omit<DailyRule, 'id' | 'createdAt'>[] = [
+  {
+    title: 'Strict "Max 2 Trades"',
+    description: 'Max 2 trades per day. Close terminal once limit is reached.',
+    category: 'risk',
+    icon: 'ban-outline',
+    color: '#EF4444',
+    isActive: true,
+  },
+  {
+    title: 'Max 1% Daily Risk',
+    description: 'Strict 1% daily risk cap. Pre-calculate lot size before entry.',
+    category: 'risk',
+    icon: 'wallet-outline',
+    color: '#F97316',
+    isActive: true,
+  },
+  {
+    title: 'Minimum 1:2 to 1:3 RR',
+    description: 'Minimum 1:2 or 1:3 room required. Trail winners, no panic exits.',
+    category: 'setup',
+    icon: 'scale-outline',
+    color: '#10B981',
+    isActive: true,
+  },
+  {
+    title: 'No Chasing (Limit Orders First)',
+    description: 'Never chase running price. Let price come to your level or miss the move.',
+    category: 'setup',
+    icon: 'locate-outline',
+    color: '#8B5CF6',
+    isActive: true,
+  },
+  {
+    title: 'High-Impact News Quarantine',
+    description: 'No execution during CPI, NFP, or major news. Let spikes & slippage settle.',
+    category: 'timing',
+    icon: 'flash-outline',
+    color: '#F59E0B',
+    isActive: true,
+  },
+  {
+    title: '"Cash Is A Position"',
+    description: 'Zero-trade days are disciplined decisions, not failures. Wait for clean setups.',
+    category: 'psychology',
+    icon: 'cash-outline',
+    color: '#06B6D4',
+    isActive: true,
+  },
+  {
+    title: 'A+ Confluence Filter Only',
+    description: 'Trade only when HTF Trend Bias + Liquidity Sweep + Key POI align together.',
+    category: 'setup',
+    icon: 'filter-outline',
+    color: '#6366F1',
+    isActive: true,
+  },
+  {
+    title: 'Price Action Over Indicators',
+    description: 'Indicators are just scanners. Execute purely on candle reactions & sweeps.',
+    category: 'setup',
+    icon: 'eye-outline',
+    color: '#14B8A6',
+    isActive: true,
+  },
+  {
+    title: 'Trade London & NY Sessions Only',
+    description: 'New trade entries allowed only during London (12–3:30 PM) & NY (5:30–9 PM IST). No closing/holding time limit.',
+    category: 'timing',
+    icon: 'time-outline',
+    color: '#D97706',
+    isActive: true,
+  },
+  {
+    title: 'Multi-Timeframe Hierarchy (4H→1H→15M)',
+    description: 'Top-down flow: 4H trend bias → 1H swing structure → 15M/5M sweep confirmation.',
+    category: 'setup',
+    icon: 'layers-outline',
+    color: '#8B5CF6',
+    isActive: true,
+  },
+  {
+    title: 'Breakeven Protection (SL to BE)',
+    description: 'Move SL to entry at 1:1 or key swing break. Protect capital first.',
+    category: 'risk',
+    icon: 'lock-closed-outline',
+    color: '#059669',
+    isActive: true,
+  },
+  {
+    title: 'No Widening Stop-Loss',
+    description: 'Never move SL further away. Accept the invalidation, protect drawdown.',
+    category: 'risk',
+    icon: 'close-circle-outline',
+    color: '#DC2626',
+    isActive: true,
+  },
+  {
+    title: 'Set & Forget (No Screen Staring)',
+    description: 'Set SL/TP and walk away. Stop watching tick-by-tick P&L on your phone.',
+    category: 'psychology',
+    icon: 'eye-off-outline',
+    color: '#64748B',
+    isActive: true,
+  },
+  {
+    title: 'Mandatory Trade Journaling',
+    description: 'Log entry/exit charts, setup rationale, and emotions for every trade.',
+    category: 'custom',
+    icon: 'journal-outline',
+    color: '#3B82F6',
+    isActive: true,
+  },
+  {
+    title: 'No Revenge Trading',
+    description: 'Take mandatory 30-min break after any loss before considering next trade.',
+    category: 'psychology',
+    icon: 'pause-circle-outline',
+    color: '#EF4444',
+    isActive: true,
+  },
+  {
+    title: 'Stop on 2 Consecutive Losses',
+    description: 'Close terminal for the day after 2 consecutive stop-losses.',
+    category: 'risk',
+    icon: 'hand-left-outline',
+    color: '#E11D48',
+    isActive: true,
+  },
+  {
+    title: 'Weekend Market Prep & Review',
+    description: 'Review weekly trade statistics and mark key HTF levels before Monday.',
+    category: 'custom',
+    icon: 'calendar-outline',
+    color: '#0284C7',
+    isActive: true,
+  },
+  {
+    title: 'Emotion-Free Position Sizing',
+    description: 'If position size makes your heart race, lot size is too big. Reduce sizing.',
+    category: 'psychology',
+    icon: 'heart-outline',
+    color: '#EC4899',
+    isActive: true,
+  },
+];
 
 export const GoalsScreen: React.FC = () => {
-  const { colors, typography, spacing, radii } = useTheme();
+  const { colors, typography, spacing, radii, isDark } = useTheme();
   const insets = useSafeAreaInsets();
 
   const { activeAccount } = useAccountStore();
   const updateAccountMutation = useUpdateAccount(activeAccount?._id || '');
   const { showToast } = useToast();
 
-  // Tab state: 'targets' (Account targets) or 'goals' (Legacy monthly goals)
-  const [activeTab, setActiveTab] = useState<'targets' | 'goals'>('targets');
+  // Tab state: 'targets' | 'rules'
+  const [activeTab, setActiveTab] = useState<'targets' | 'rules'>('targets');
 
-  // Legacy Monthly Goals state
-  const { data: goals, isLoading: goalsLoading } = useRecentGoals();
-  const { data: currentGoal, isLoading: currentLoading } = useGoal(CURRENT_MONTH);
-  const { mutateAsync: createGoal } = useCreateGoal();
+  // ─── Daily Rules state ──────────────────────────────────────────────────────
+  const [rules, setRules] = useState<DailyRule[]>([]);
+  const [showRuleModal, setShowRuleModal] = useState(false);
+  const [showPresetsModal, setShowPresetsModal] = useState(false);
+  const [editingRule, setEditingRule] = useState<DailyRule | null>(null);
+  const [ruleForm, setRuleForm] = useState({
+    title: '',
+    description: '',
+    category: 'custom' as DailyRule['category'],
+  });
+
+  // Load rules from storage
+  const loadRules = useCallback(async () => {
+    try {
+      const stored = await AsyncStorage.getItem(RULES_STORAGE_KEY);
+      if (stored) {
+        setRules(JSON.parse(stored));
+      } else {
+        // Initial setup: seed top 5 institutional rules (active by default)
+        const defaultSeeded: DailyRule[] = PRESET_RULES.slice(0, 5).map((p, idx) => ({
+          ...p,
+          id: (Date.now() + idx).toString(),
+          isActive: true,
+          createdAt: new Date().toISOString(),
+        }));
+        await AsyncStorage.setItem(RULES_STORAGE_KEY, JSON.stringify(defaultSeeded));
+        setRules(defaultSeeded);
+      }
+    } catch (e) { /* ignore */ }
+  }, []);
+
+  const saveRules = useCallback(async (newRules: DailyRule[]) => {
+    try {
+      await AsyncStorage.setItem(RULES_STORAGE_KEY, JSON.stringify(newRules));
+    } catch (e) { /* ignore */ }
+  }, []);
+
+  useEffect(() => { loadRules(); }, [loadRules]);
+
+  const handleToggleRule = (id: string) => {
+    const updated = rules.map((r) => {
+      if (r.id === id) {
+        const next = !r.isActive;
+        showToast(next ? `Rule activated` : `Rule paused`, 'info');
+        return { ...r, isActive: next };
+      }
+      return r;
+    });
+    setRules(updated);
+    saveRules(updated);
+  };
+
+  const handleActivateAll = () => {
+    const updated = rules.map((r) => ({ ...r, isActive: true }));
+    setRules(updated);
+    saveRules(updated);
+    showToast('All rules applied', 'success');
+  };
+
+  const handlePauseAll = () => {
+    const updated = rules.map((r) => ({ ...r, isActive: false }));
+    setRules(updated);
+    saveRules(updated);
+    showToast('All rules paused', 'info');
+  };
+
+  const handleAddRule = () => {
+    if (!ruleForm.title.trim()) { showToast('Please enter a rule title', 'error'); return; }
+    const newRule: DailyRule = {
+      id: Date.now().toString(),
+      title: ruleForm.title.trim(),
+      description: ruleForm.description.trim() || undefined,
+      category: ruleForm.category,
+      isActive: true,
+      createdAt: new Date().toISOString(),
+    };
+    const updated = editingRule
+      ? rules.map((r) => r.id === editingRule.id ? { ...newRule, id: editingRule.id, createdAt: editingRule.createdAt } : r)
+      : [...rules, newRule];
+    setRules(updated);
+    saveRules(updated);
+    setShowRuleModal(false);
+    setEditingRule(null);
+    setRuleForm({ title: '', description: '', category: 'custom' });
+    showToast(editingRule ? 'Rule updated' : 'Rule added', 'success');
+  };
+
+  const handleDeleteRule = (id: string) => {
+    Alert.alert('Delete Rule', 'Are you sure you want to delete this rule?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete', style: 'destructive',
+        onPress: () => {
+          const updated = rules.filter((r) => r.id !== id);
+          setRules(updated);
+          saveRules(updated);
+        },
+      },
+    ]);
+  };
+
+  const handleEditRule = (rule: DailyRule) => {
+    setEditingRule(rule);
+    setRuleForm({ title: rule.title, description: rule.description || '', category: rule.category });
+    setShowRuleModal(true);
+  };
+
+  const handleAddPresets = (preset: Omit<DailyRule, 'id' | 'createdAt'>) => {
+    const alreadyExists = rules.some((r) => r.title === preset.title);
+    if (alreadyExists) { showToast('Rule already exists', 'error'); return; }
+    const newRule: DailyRule = { ...preset, id: Date.now().toString() + Math.random(), createdAt: new Date().toISOString() };
+    const updated = [...rules, newRule];
+    setRules(updated);
+    saveRules(updated);
+    showToast('Rule added', 'success');
+  };
 
   // Targets calculations queries
   const { data: allData, isLoading: allLoading } = useQuery({
@@ -59,17 +340,6 @@ export const GoalsScreen: React.FC = () => {
     enabled: !!activeAccount,
   });
 
-  const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState({
-    month: CURRENT_MONTH,
-    targetWinRate: '60',
-    targetRR: '2.0',
-    maxDailyTrades: '3',
-    targetConsistency: '75',
-    targetNetRR: '',
-    targetTrades: '',
-  });
-
   // Targets Edit Modal state
   const [showTargetsModal, setShowTargetsModal] = useState(false);
   const [targetsForm, setTargetsForm] = useState({
@@ -77,14 +347,6 @@ export const GoalsScreen: React.FC = () => {
     maxDailyLoss: '',
     maxOverallLoss: '',
   });
-
-  // Custom Month Picker state
-  const [showMonthPicker, setShowMonthPicker] = useState(false);
-  const [selectedYear, setSelectedYear] = useState(dayjs().year());
-  const MONTHS = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ];
 
   const handleOpenTargetsModal = () => {
     if (!activeAccount) return;
@@ -133,30 +395,6 @@ export const GoalsScreen: React.FC = () => {
     }
   };
 
-  const handleSelectMonth = (monthIndex: number) => {
-    const formatted = `${selectedYear}-${String(monthIndex + 1).padStart(2, '0')}`;
-    setForm((p) => ({ ...p, month: formatted }));
-    setShowMonthPicker(false);
-  };
-
-  const handleSaveGoal = async () => {
-    try {
-      await createGoal({
-        month: form.month,
-        targetRR: parseFloat(form.targetRR) || 2,
-        targetWinRate: parseFloat(form.targetWinRate) || 60,
-        maxDailyTrades: parseInt(form.maxDailyTrades) || 3,
-        targetConsistency: parseFloat(form.targetConsistency) || 75,
-        ...(form.targetNetRR ? { targetNetRR: parseFloat(form.targetNetRR) } : {}),
-        ...(form.targetTrades ? { targetTrades: parseInt(form.targetTrades) } : {}),
-      });
-      setShowModal(false);
-      showToast('Monthly goal saved successfully', 'success');
-    } catch (e: any) {
-      showToast(e.message || 'Failed to save goal', 'error');
-    }
-  };
-
   const handleUpdateStatus = async (status: AccountStatus) => {
     if (!activeAccount) return;
     try {
@@ -185,17 +423,22 @@ export const GoalsScreen: React.FC = () => {
     achieved?: boolean;
     isLossLimit?: boolean;
   }) => {
-    const isPrimaryColor = isLossLimit ? (percentage > 85 ? colors.error : percentage > 60 ? colors.warning : colors.success) : (achieved ? colors.success : colors.primary);
+    const isPrimaryColor = isLossLimit
+      ? (percentage > 70 ? colors.error : percentage > 40 ? '#F97316' : '#F59E0B')
+      : (achieved ? colors.success : (current < 0 ? colors.error : (isDark ? '#FFFFFF' : colors.primary)));
 
     return (
       <View style={{ marginBottom: spacing[4] }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing[1] }}>
-          <Text style={[typography.body, { color: colors.textSecondary, flex: 1, marginRight: 8 }]} numberOfLines={1}>{label}</Text>
-          <Text style={[typography.label, { color: isPrimaryColor, textAlign: 'right' }]}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+          <Text style={[typography.body, { color: colors.textPrimary, fontWeight: '600', flex: 1, marginRight: 8 }]} numberOfLines={1}>
+            {label}
+          </Text>
+          <Text style={[typography.label, { color: isPrimaryColor, textAlign: 'right', fontWeight: '700' }]}>
             {format(current)} <Text style={{ color: colors.textTertiary, fontWeight: '400' }}>/ {format(target)}</Text>
           </Text>
         </View>
-        <View style={{ height: 8, backgroundColor: colors.surfaceHighlight, borderRadius: radii.full, overflow: 'hidden' }}>
+
+        <View style={{ height: 8, backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#E2E8F0', borderRadius: radii.full, overflow: 'hidden' }}>
           <View
             style={{
               width: `${Math.min(Math.max(0, percentage), 100)}%`,
@@ -205,89 +448,19 @@ export const GoalsScreen: React.FC = () => {
             }}
           />
         </View>
-        <Text style={[typography.caption, { color: colors.textTertiary, marginTop: 4 }]}>
-          {Math.round(percentage)}% {isLossLimit ? 'limit utilized' : 'target completed'}
-        </Text>
+
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+          <Text style={[typography.caption, { color: colors.textTertiary, fontSize: 11 }]}>
+            {isLossLimit ? 'Risk limit utilized' : 'Target completed'}
+          </Text>
+          <Text style={[typography.caption, { color: isPrimaryColor, fontWeight: '700', fontSize: 11 }]}>
+            {Math.round(percentage)}%
+          </Text>
+        </View>
       </View>
     );
   };
 
-  // Legacy Goal Card Render
-  const GoalCard = ({ goalData, isCurrent }: { goalData: GoalWithProgress; isCurrent: boolean }) => {
-    const { goal, progress, stats, tradeCount } = goalData;
-    const allAchieved = [progress.winRate, progress.avgRR, progress.consistency].every((p) => p.achieved);
-
-    const overallPct = Math.round(
-      [progress.winRate, progress.avgRR, progress.consistency, progress.netRR, progress.trades]
-        .filter(Boolean)
-        .reduce((sum, p) => sum + (p?.percentage ?? 0), 0) /
-      [progress.winRate, progress.avgRR, progress.consistency, progress.netRR, progress.trades].filter(
-        Boolean
-      ).length
-    );
-
-    return (
-      <Card style={{ marginBottom: spacing[4], borderWidth: isCurrent ? 1 : 0, borderColor: colors.primary + '50' }}>
-        {isCurrent && (
-          <LinearGradient
-            colors={['rgba(99,102,241,0.06)', 'transparent']}
-            style={StyleSheet.absoluteFill}
-            pointerEvents="none"
-          />
-        )}
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing[4] }}>
-          <View>
-            <Text style={[typography.h3, { color: colors.textPrimary }]}>
-              {dayjs(goal.month + '-01').format('MMMM YYYY')}
-            </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: spacing[1] }}>
-              {isCurrent && (
-                <View style={{ backgroundColor: colors.primarySubtle, borderRadius: radii.sm, paddingHorizontal: 8, paddingVertical: 3 }}>
-                  <Text style={[typography.caption, { color: colors.primary, fontWeight: '700' }]}>Current</Text>
-                </View>
-              )}
-              {allAchieved && (
-                <View style={{ backgroundColor: colors.successSubtle, borderRadius: radii.sm, paddingHorizontal: 8, paddingVertical: 3 }}>
-                  <Text style={[typography.caption, { color: colors.success, fontWeight: '700' }]}>🎉 Met!</Text>
-                </View>
-              )}
-            </View>
-          </View>
-          <View style={{ alignItems: 'center' }}>
-            <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: colors.primarySubtle, alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={[typography.numericSm, { color: colors.primary, fontSize: 16 }]}>{overallPct}%</Text>
-            </View>
-            <Text style={[typography.caption, { color: colors.textTertiary, marginTop: 4 }]}>{tradeCount} trades</Text>
-          </View>
-        </View>
-
-        <ProgressBar
-          label="Win Rate"
-          current={progress.winRate.current}
-          target={progress.winRate.target}
-          percentage={progress.winRate.percentage}
-          achieved={progress.winRate.achieved}
-          format={(v) => formatPercent(v)}
-        />
-        <ProgressBar
-          label="Avg Risk:Reward"
-          current={progress.avgRR.current}
-          target={progress.avgRR.target}
-          percentage={progress.avgRR.percentage}
-          achieved={progress.avgRR.achieved}
-          format={(v) => `${v.toFixed(2)}R`}
-        />
-        <ProgressBar
-          label="Discipline Score"
-          current={progress.consistency.current}
-          target={progress.consistency.target}
-          percentage={progress.consistency.percentage}
-          achieved={progress.consistency.achieved}
-          format={(v) => `${Math.round(v)}/100`}
-        />
-      </Card>
-    );
-  };
 
   // Render Account targets (Prop Firm Rules / Personal Targets)
   const renderAccountTargets = () => {
@@ -348,30 +521,41 @@ export const GoalsScreen: React.FC = () => {
       <View style={{ flex: 1 }}>
         {/* Account Summary Card */}
         <Card style={{ marginBottom: spacing[4], padding: spacing[4], backgroundColor: colors.surface }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border, paddingBottom: spacing[3], marginBottom: spacing[3] }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: isDark ? 'rgba(255,255,255,0.08)' : colors.border, paddingBottom: spacing[3], marginBottom: spacing[3] }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
               <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: status === 'active' || status === 'funded' ? colors.success : status === 'failed' ? colors.error : colors.textTertiary }} />
-              <Text style={[typography.label, { color: colors.textPrimary, textTransform: 'capitalize', fontWeight: '700' }]}>{status} Account</Text>
+              <Text style={[typography.label, { color: colors.textPrimary, textTransform: 'capitalize', fontWeight: '700', fontSize: 14 }]}>
+                {activeAccount.name || `${status} Account`}
+              </Text>
             </View>
-            <Text style={[typography.caption, { color: colors.textTertiary, textTransform: 'uppercase' }]}>{getAccountLabel(accountType)}</Text>
+            <View style={{ backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : '#F1F5F9', paddingHorizontal: 8, paddingVertical: 2.5, borderRadius: radii.sm }}>
+              <Text style={[typography.caption, { color: colors.textTertiary, textTransform: 'uppercase', fontWeight: '700', fontSize: 10 }]}>
+                {getAccountLabel(accountType)}
+              </Text>
+            </View>
           </View>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-            <View style={{ width: '50%', marginBottom: spacing[3] }}>
-              <Text style={[typography.caption, { color: colors.textTertiary, marginBottom: 2 }]}>STARTING BALANCE</Text>
-              <Text style={[typography.label, { color: colors.textPrimary, fontSize: 16, fontWeight: '700' }]}>{formatBalance(startingBalance, currency)}</Text>
+
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            <View style={{ width: '48%', backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : '#F8FAFC', borderRadius: radii.md, padding: spacing[3] }}>
+              <Text style={[typography.caption, { color: colors.textTertiary, marginBottom: 3, fontSize: 10.5 }]}>STARTING BALANCE</Text>
+              <Text style={[typography.label, { color: colors.textPrimary, fontSize: 16, fontWeight: '700' }]}>
+                {formatBalance(startingBalance, currency)}
+              </Text>
             </View>
-            <View style={{ width: '50%', marginBottom: spacing[3], alignItems: 'flex-end' }}>
-              <Text style={[typography.caption, { color: colors.textTertiary, marginBottom: 2 }]}>CURRENT BALANCE</Text>
-              <Text style={[typography.label, { color: colors.textPrimary, fontSize: 16, fontWeight: '700' }]}>{formatBalance(currentBalance, currency)}</Text>
+            <View style={{ width: '48%', backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : '#F8FAFC', borderRadius: radii.md, padding: spacing[3] }}>
+              <Text style={[typography.caption, { color: colors.textTertiary, marginBottom: 3, fontSize: 10.5 }]}>CURRENT BALANCE</Text>
+              <Text style={[typography.label, { color: colors.textPrimary, fontSize: 16, fontWeight: '700' }]}>
+                {formatBalance(currentBalance, currency)}
+              </Text>
             </View>
-            <View style={{ width: '50%' }}>
-              <Text style={[typography.caption, { color: colors.textTertiary, marginBottom: 2 }]}>TOTAL P&L</Text>
+            <View style={{ width: '48%', backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : '#F8FAFC', borderRadius: radii.md, padding: spacing[3] }}>
+              <Text style={[typography.caption, { color: colors.textTertiary, marginBottom: 3, fontSize: 10.5 }]}>TOTAL P&L</Text>
               <Text style={[typography.label, { color: netPnL >= 0 ? colors.success : colors.error, fontSize: 16, fontWeight: '700' }]}>
                 {formatPnL(netPnL, currency)}
               </Text>
             </View>
-            <View style={{ width: '50%', alignItems: 'flex-end' }}>
-              <Text style={[typography.caption, { color: colors.textTertiary, marginBottom: 2 }]}>TOTAL RETURN</Text>
+            <View style={{ width: '48%', backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : '#F8FAFC', borderRadius: radii.md, padding: spacing[3] }}>
+              <Text style={[typography.caption, { color: colors.textTertiary, marginBottom: 3, fontSize: 10.5 }]}>TOTAL RETURN</Text>
               <Text style={[typography.label, { color: netPnL >= 0 ? colors.success : colors.error, fontSize: 16, fontWeight: '700' }]}>
                 {netPnL >= 0 ? '+' : ''}{totalReturnPercent.toFixed(2)}%
               </Text>
@@ -381,19 +565,28 @@ export const GoalsScreen: React.FC = () => {
 
         {!hasTargets ? (
           /* Empty State targets */
-          <Card style={{ padding: spacing[5], alignItems: 'center', justifyContent: 'center', minHeight: 180 }}>
-            <Ionicons name="shield-outline" size={40} color={colors.textTertiary} style={{ marginBottom: spacing[3], alignSelf: "center" }} />
-            <Text style={[typography.h3, { color: colors.textPrimary, textAlign: 'center', marginBottom: spacing[2] }]}>
-              Set your trading targets
-            </Text>
-            <Text style={[typography.body, { color: colors.textTertiary, textAlign: 'center', marginBottom: spacing[4], paddingHorizontal: spacing[3], lineHeight: 20 }]}>
-              Add an optional profit goal and risk limits to track your account progress.
-            </Text>
-            <Button
-              label="Set Account Targets"
-              onPress={handleOpenTargetsModal}
-              style={{ width: '80%', alignSelf: "center" }}
-            />
+          <Card style={{ minHeight: 220 }}>
+            <View style={{ alignItems: 'center', justifyContent: 'center', width: '100%', paddingVertical: spacing[3] }}>
+              <View style={{
+                width: 64, height: 64, borderRadius: 32,
+                backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : colors.primarySubtle,
+                alignItems: 'center', justifyContent: 'center',
+                marginBottom: spacing[3],
+              }}>
+                <Ionicons name="shield-outline" size={32} color={colors.primary} />
+              </View>
+              <Text style={[typography.h3, { color: colors.textPrimary, textAlign: 'center', marginBottom: spacing[2] }]}>
+                Set your trading targets
+              </Text>
+              <Text style={[typography.body, { color: colors.textTertiary, textAlign: 'center', marginBottom: spacing[4], paddingHorizontal: spacing[3], lineHeight: 20 }]}>
+                Add an optional profit goal and risk limits to track your account progress.
+              </Text>
+              <Button
+                label="Set Account Targets"
+                onPress={handleOpenTargetsModal}
+                style={{ width: '80%', alignSelf: 'center' }}
+              />
+            </View>
           </Card>
         ) : (
           isProp ? (
@@ -477,7 +670,7 @@ export const GoalsScreen: React.FC = () => {
                           style={[
                             typography.caption,
                             {
-                              color: isCurrentStatus ? '#fff' : colors.textPrimary,
+                              color: isCurrentStatus ? (st === 'active' && isDark ? '#0F172A' : '#FFFFFF') : colors.textPrimary,
                               fontWeight: '600',
                               textTransform: 'capitalize',
                             },
@@ -563,62 +756,59 @@ export const GoalsScreen: React.FC = () => {
         <View>
           <Text style={[typography.h2, { color: colors.textPrimary }]}>Targets & Goals</Text>
           <Text style={[typography.body, { color: colors.textTertiary }]}>
-            {activeTab === 'targets' ? 'Account target rules tracking' : 'Monthly habits and targets'}
+            {activeTab === 'targets' ? 'Account target rules tracking' : 'Your personal trading rules'}
           </Text>
         </View>
-
-        {activeTab === 'goals' && (
-          <TouchableOpacity
-            onPress={() => setShowModal(true)}
-            style={[
-              styles.setGoalButton,
-              {
-                backgroundColor: colors.primary,
-                borderRadius: radii.full,
-                paddingHorizontal: spacing[4],
-                paddingVertical: spacing[2],
-              },
-            ]}
-          >
-            <Ionicons name="add" size={18} color="#fff" />
-            <Text style={[typography.label, { color: '#fff' }]}>Set Goal</Text>
-          </TouchableOpacity>
-        )}
       </View>
+
 
       {/* Segment Selector Tab Row */}
       <View style={[styles.tabSelectorRow, { marginHorizontal: spacing[5], marginBottom: spacing[4] }]}>
-        <TouchableOpacity
-          onPress={() => setActiveTab('targets')}
-          style={[
-            styles.tabSelectorButton,
-            {
-              backgroundColor: activeTab === 'targets' ? colors.primary : colors.surfaceElevated,
-              borderRadius: radii.full,
-              paddingVertical: spacing[2],
-            },
-          ]}
-        >
-          <Text style={[typography.label, { color: activeTab === 'targets' ? '#fff' : colors.textSecondary }]}>
-            Account Targets
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          onPress={() => setActiveTab('goals')}
-          style={[
-            styles.tabSelectorButton,
-            {
-              backgroundColor: activeTab === 'goals' ? colors.primary : colors.surfaceElevated,
-              borderRadius: radii.full,
-              paddingVertical: spacing[2],
-            },
-          ]}
-        >
-          <Text style={[typography.label, { color: activeTab === 'goals' ? '#fff' : colors.textSecondary }]}>
-            Habits & Goals
-          </Text>
-        </TouchableOpacity>
+        {(['targets', 'rules'] as const).map((tab) => {
+          const labels = { targets: 'Account Targets', rules: 'Daily Rules' };
+          const isActive = activeTab === tab;
+          return (
+            <TouchableOpacity
+              key={tab}
+              onPress={() => setActiveTab(tab)}
+              activeOpacity={0.8}
+              style={[
+                styles.tabSelectorButton,
+                {
+                  backgroundColor: isActive ? (isDark ? '#FFFFFF' : '#0F172A') : colors.surfaceElevated,
+                  borderRadius: radii.full,
+                  paddingVertical: spacing[2.5],
+                  shadowColor: isActive ? '#000' : 'transparent',
+                  shadowOffset: { width: 0, height: 1.5 },
+                  shadowOpacity: isActive ? (isDark ? 0.25 : 0.08) : 0,
+                  shadowRadius: 2.5,
+                  elevation: isActive ? 2 : 0,
+                },
+              ]}
+            >
+              {tab === 'rules' && rules.filter(r => r.isActive).length > 0 && (
+                <View style={{
+                  width: 7, height: 7, borderRadius: 3.5,
+                  backgroundColor: isActive ? (isDark ? '#0F172A' : '#FFF') : '#10B981',
+                  marginRight: 5,
+                }} />
+              )}
+              <Text
+                style={[
+                  typography.label,
+                  {
+                    color: isActive ? (isDark ? '#0F172A' : '#FFFFFF') : colors.textSecondary,
+                    fontWeight: isActive ? '700' : '500',
+                    fontSize: 13,
+                  },
+                ]}
+                numberOfLines={1}
+              >
+                {labels[tab]}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       <ScrollView
@@ -637,131 +827,390 @@ export const GoalsScreen: React.FC = () => {
             renderAccountTargets()
           )
         ) : (
-          // ─── LEGACY MONTHLY HABITS AND GOALS TAB ───
+          // ─── DAILY RULES TAB ───
           <View>
-            {!currentLoading && !currentGoal && (
+            {/* Header actions */}
+            <View style={{ flexDirection: 'row', gap: 10, marginBottom: spacing[4] }}>
               <TouchableOpacity
-                onPress={() => setShowModal(true)}
+                onPress={() => {
+                  setEditingRule(null);
+                  setRuleForm({ title: '', description: '', category: 'custom' });
+                  setShowRuleModal(true);
+                }}
                 style={[
-                  styles.emptyGoalBox,
-                  {
-                    backgroundColor: colors.primarySubtle,
-                    borderRadius: radii.xl,
-                    borderColor: colors.primary + '40',
-                    padding: spacing[5],
-                    marginBottom: spacing[4],
-                  },
+                  styles.rulesActionBtn,
+                  { backgroundColor: isDark ? '#FFFFFF' : '#0F172A', flex: 1 },
                 ]}
               >
-                <Ionicons name="trophy-outline" size={32} color={colors.primary} />
-                <Text style={[typography.h3, { color: colors.primary, marginTop: spacing[3] }]}>
-                  Set {dayjs().format('MMMM')} Goal
-                </Text>
-                <Text style={[typography.body, { color: colors.textTertiary, textAlign: 'center', marginTop: spacing[1] }]}>
-                  Define your habits and win rate targets for this month.
-                </Text>
+                <Ionicons name="add" size={16} color={isDark ? '#0F172A' : '#FFFFFF'} />
+                <Text style={[typography.label, { color: isDark ? '#0F172A' : '#FFFFFF', fontWeight: '700' }]}>Add Rule</Text>
               </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setShowPresetsModal(true)}
+                style={[
+                  styles.rulesActionBtn,
+                  { backgroundColor: colors.primarySubtle, flex: 1 },
+                ]}
+              >
+                <Ionicons name="sparkles-outline" size={16} color={colors.primary} />
+                <Text style={[typography.label, { color: colors.primary, fontWeight: '700' }]}>Quick Add</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Stats summary */}
+            {rules.length > 0 && (
+              <Card style={{ marginBottom: spacing[4], padding: spacing[3] }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center' }}>
+                  <View style={{ alignItems: 'center' }}>
+                    <Text style={[typography.numericSm, { color: colors.textPrimary, fontSize: 22, fontWeight: '700' }]}>
+                      {rules.length}
+                    </Text>
+                    <Text style={[typography.caption, { color: colors.textTertiary }]}>Total Rules</Text>
+                  </View>
+                  <View style={{ width: 1, height: 28, backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : colors.border }} />
+                  <View style={{ alignItems: 'center' }}>
+                    <Text style={[typography.numericSm, { color: '#10B981', fontSize: 22, fontWeight: '700' }]}>
+                      {rules.filter(r => r.isActive).length}
+                    </Text>
+                    <Text style={[typography.caption, { color: colors.textTertiary }]}>Active (Applied)</Text>
+                  </View>
+                  <View style={{ width: 1, height: 28, backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : colors.border }} />
+                  <View style={{ alignItems: 'center' }}>
+                    <Text style={[typography.numericSm, { color: colors.textTertiary, fontSize: 22, fontWeight: '700' }]}>
+                      {rules.filter(r => !r.isActive).length}
+                    </Text>
+                    <Text style={[typography.caption, { color: colors.textTertiary }]}>Paused</Text>
+                  </View>
+                </View>
+
+                {/* Status info */}
+                <View style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  marginTop: spacing[3],
+                  paddingTop: spacing[2.5],
+                  borderTopWidth: StyleSheet.hairlineWidth,
+                  borderTopColor: isDark ? 'rgba(255,255,255,0.08)' : colors.border,
+                }}>
+                  <Ionicons name="shield-checkmark-outline" size={13} color="#10B981" />
+                  <Text style={[typography.caption, { color: colors.textTertiary, fontSize: 11.5 }]}>
+                    Active rules are monitored by AI Coach & trade journal audits
+                  </Text>
+                </View>
+
+                {/* Action buttons: Apply All / Pause All */}
+                <View style={{ flexDirection: 'row', gap: 10, marginTop: spacing[2.5] }}>
+                  <TouchableOpacity
+                    onPress={handleActivateAll}
+                    activeOpacity={0.75}
+                    style={{
+                      flex: 1,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                      backgroundColor: isDark ? 'rgba(16, 185, 129, 0.12)' : '#ECFDF5',
+                      borderColor: isDark ? 'rgba(16, 185, 129, 0.25)' : '#A7F3D0',
+                      borderWidth: 1,
+                      borderRadius: radii.lg,
+                      paddingVertical: 9,
+                    }}
+                  >
+                    <Ionicons name="flash-outline" size={15} color="#10B981" />
+                    <Text style={[typography.caption, { color: '#10B981', fontWeight: '700', fontSize: 12 }]}>
+                      Apply All
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={handlePauseAll}
+                    activeOpacity={0.75}
+                    style={{
+                      flex: 1,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                      backgroundColor: isDark ? 'rgba(100, 116, 139, 0.12)' : '#F1F5F9',
+                      borderColor: isDark ? 'rgba(100, 116, 139, 0.25)' : '#CBD5E1',
+                      borderWidth: 1,
+                      borderRadius: radii.lg,
+                      paddingVertical: 9,
+                    }}
+                  >
+                    <Ionicons name="pause-circle-outline" size={14} color={colors.textTertiary} />
+                    <Text style={[typography.caption, { color: colors.textSecondary, fontWeight: '700', fontSize: 12 }]}>
+                      Pause All
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </Card>
             )}
 
-            {goalsLoading ? (
-              <ActivityIndicator size="small" color={colors.primary} style={{ marginTop: 20 }} />
-            ) : (goals ?? []).length === 0 ? (
-              <Card>
-                <View style={{ alignItems: 'center', padding: spacing[6] }}>
-                  <Text style={[typography.h3, { color: colors.textPrimary, textAlign: 'center' }]}>
-                    No habits set yet
+            {/* Rules grouped by category */}
+            {rules.length === 0 ? (
+              <Card style={{ minHeight: 300, overflow: 'hidden' }}>
+                <View style={{ flex: 1, minHeight: 280, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing[4], paddingVertical: spacing[6] }}>
+                  <View style={{
+                    width: 72, height: 72, borderRadius: 36,
+                    backgroundColor: colors.primarySubtle,
+                    alignItems: 'center', justifyContent: 'center',
+                    marginBottom: spacing[4],
+                  }}>
+                    <Ionicons name="shield-checkmark-outline" size={34} color={colors.primary} />
+                  </View>
+                  <Text style={[typography.h3, { color: colors.textPrimary, textAlign: 'center', marginBottom: spacing[2] }]}>
+                    No daily rules yet
                   </Text>
-                  <Text style={[typography.body, { color: colors.textTertiary, textAlign: 'center', marginTop: spacing[2] }]}>
-                    Define monthly win rate and discipline habits targets to track.
+                  <Text style={[typography.body, { color: colors.textTertiary, textAlign: 'center', lineHeight: 20 }]}>
+                    Define the rules you must follow every trading day to stay disciplined and consistent.
                   </Text>
+                  <TouchableOpacity
+                    onPress={() => setShowPresetsModal(true)}
+                    style={[
+                      styles.rulesActionBtn,
+                      { backgroundColor: colors.primarySubtle, marginTop: spacing[4], paddingHorizontal: spacing[5] },
+                    ]}
+                  >
+                    <Ionicons name="sparkles-outline" size={16} color={colors.primary} />
+                    <Text style={[typography.label, { color: colors.primary, fontWeight: '700' }]}>Add from presets</Text>
+                  </TouchableOpacity>
                 </View>
               </Card>
             ) : (
-              (goals ?? []).map((goalData) => {
-                if (!goalData) return null;
-                const isCurrent = goalData.goal.month === CURRENT_MONTH;
-                return <GoalCard key={goalData.goal._id} goalData={goalData} isCurrent={isCurrent} />;
+              (Object.keys(RULE_CATEGORY_META) as DailyRule['category'][]).map((category) => {
+                const categoryRules = rules.filter((r) => r.category === category);
+                if (categoryRules.length === 0) return null;
+                const meta = RULE_CATEGORY_META[category];
+                return (
+                  <View key={category} style={{ marginBottom: spacing[4] }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: spacing[2] }}>
+                      <Ionicons name={meta.icon} size={15} color={meta.color} />
+                      <Text style={[typography.label, { color: colors.textSecondary, fontWeight: '700', fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.8 }]}>
+                        {meta.label}
+                      </Text>
+                      <View style={{ flex: 1, height: 1, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : colors.border, marginLeft: 4 }} />
+                    </View>
+                    {categoryRules.map((rule) => {
+                      const ruleColor = rule.color || meta.color;
+                      const ruleIcon = rule.icon || meta.icon;
+                      return (
+                        <Card
+                          key={rule.id}
+                          style={StyleSheet.flatten([
+                            styles.ruleCard,
+                            {
+                              opacity: rule.isActive ? 1 : 0.6,
+                              borderLeftWidth: 3,
+                              borderLeftColor: rule.isActive ? ruleColor : (isDark ? '#334155' : '#CBD5E1'),
+                              marginBottom: spacing[2],
+                              paddingVertical: 10,
+                              paddingHorizontal: 12,
+                            },
+                          ])}
+                        >
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                            {/* Rule Icon */}
+                            <View style={{
+                              width: 36,
+                              height: 36,
+                              borderRadius: 10,
+                              backgroundColor: rule.isActive ? (ruleColor + '18') : (isDark ? 'rgba(255,255,255,0.05)' : '#F1F5F9'),
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}>
+                              <Ionicons name={ruleIcon} size={18} color={rule.isActive ? ruleColor : colors.textTertiary} />
+                            </View>
+
+                            {/* Clean Title Only - No extra description clutter */}
+                            <View style={{ flex: 1 }}>
+                              <Text
+                                numberOfLines={2}
+                                style={[
+                                  typography.label,
+                                  {
+                                    color: rule.isActive ? colors.textPrimary : colors.textTertiary,
+                                    fontWeight: '600',
+                                    fontSize: 14,
+                                    lineHeight: 19,
+                                  },
+                                ]}
+                              >
+                                {rule.title}
+                              </Text>
+                            </View>
+
+                            {/* Proper Native Switch */}
+                            <Switch
+                              value={rule.isActive}
+                              onValueChange={() => handleToggleRule(rule.id)}
+                              trackColor={{ false: isDark ? '#334155' : '#CBD5E1', true: '#10B981' }}
+                              thumbColor="#FFFFFF"
+                              ios_backgroundColor={isDark ? '#334155' : '#CBD5E1'}
+                              style={{ transform: Platform.OS === 'ios' ? [{ scaleX: 0.8 }, { scaleY: 0.8 }] : [{ scaleX: 0.95 }, { scaleY: 0.95 }] }}
+                            />
+
+                            {/* Actions */}
+                            <View style={{ flexDirection: 'row', gap: 2, alignItems: 'center' }}>
+                              <TouchableOpacity
+                                onPress={() => handleEditRule(rule)}
+                                hitSlop={{ top: 8, bottom: 8, left: 6, right: 4 }}
+                                style={{ padding: 4 }}
+                              >
+                                <Ionicons name="pencil-outline" size={15} color={colors.textTertiary} />
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                onPress={() => handleDeleteRule(rule.id)}
+                                hitSlop={{ top: 8, bottom: 8, left: 4, right: 6 }}
+                                style={{ padding: 4 }}
+                              >
+                                <Ionicons name="trash-outline" size={15} color={colors.error} />
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        </Card>
+                      );
+                    })}
+                  </View>
+                );
               })
             )}
           </View>
         )}
       </ScrollView>
 
-      {/* Goal Creation Modal */}
-      <Modal
-        visible={showModal}
-        animationType="slide"
-        onRequestClose={() => setShowModal(false)}
-      >
+      {/* ─── Rule Add/Edit Modal ─── */}
+      <Modal visible={showRuleModal} animationType="slide" onRequestClose={() => { setShowRuleModal(false); setEditingRule(null); }}>
         <View style={[styles.modalContainer, { backgroundColor: colors.background, paddingTop: Platform.OS === 'ios' ? 50 : 20 }]}>
           <View style={[styles.modalHeader, { paddingHorizontal: spacing[5], paddingBottom: spacing[4] }]}>
-            <Text style={[typography.h2, { color: colors.textPrimary }]}>New Goal</Text>
-            <TouchableOpacity onPress={() => setShowModal(false)}>
+            <Text style={[typography.h2, { color: colors.textPrimary }]}>{editingRule ? 'Edit Rule' : 'New Rule'}</Text>
+            <TouchableOpacity onPress={() => { setShowRuleModal(false); setEditingRule(null); }}>
               <Ionicons name="close" size={28} color={colors.textPrimary} />
             </TouchableOpacity>
           </View>
-
           <ScrollView contentContainerStyle={{ paddingHorizontal: spacing[5] }} keyboardShouldPersistTaps="handled">
-            <TouchableOpacity onPress={() => setShowMonthPicker(true)} activeOpacity={0.7} style={{ marginBottom: spacing[4] }}>
-              <Text style={[typography.label, { color: colors.textSecondary, marginBottom: 6 }]}>Month</Text>
-              <View style={{
-                height: 48,
-                borderRadius: radii.md,
-                borderWidth: 1,
-                borderColor: colors.border,
-                backgroundColor: colors.surfaceElevated,
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                paddingHorizontal: spacing[3],
-              }}>
-                <Text style={[typography.body, { color: colors.textPrimary }]}>
-                  {dayjs(form.month + '-01').format('MMMM YYYY')}
-                </Text>
-                <Ionicons name="calendar-outline" size={18} color={colors.textSecondary} />
-              </View>
-            </TouchableOpacity>
-
-            <Input
-              label="Target Win Rate (%)"
-              placeholder="60"
-              value={form.targetWinRate}
-              onChangeText={(v) => setForm((p) => ({ ...p, targetWinRate: v }))}
-              keyboardType="numeric"
+            <Text style={[typography.label, { color: colors.textSecondary, marginBottom: 6 }]}>Rule Title *</Text>
+            <TextInput
+              value={ruleForm.title}
+              onChangeText={(v) => setRuleForm((p) => ({ ...p, title: v }))}
+              placeholder="e.g. No trading after 2 losses"
+              placeholderTextColor={colors.textTertiary}
+              style={[
+                styles.ruleInput,
+                {
+                  color: colors.textPrimary,
+                  backgroundColor: colors.surfaceElevated,
+                  borderColor: colors.border,
+                  marginBottom: spacing[4],
+                },
+              ]}
             />
-
-            <Input
-              label="Target Risk:Reward"
-              placeholder="2.0"
-              value={form.targetRR}
-              onChangeText={(v) => setForm((p) => ({ ...p, targetRR: v }))}
-              keyboardType="numeric"
+            <Text style={[typography.label, { color: colors.textSecondary, marginBottom: 6 }]}>Description (optional)</Text>
+            <TextInput
+              value={ruleForm.description}
+              onChangeText={(v) => setRuleForm((p) => ({ ...p, description: v }))}
+              placeholder="Details or reasoning for this rule"
+              placeholderTextColor={colors.textTertiary}
+              multiline
+              numberOfLines={3}
+              style={[
+                styles.ruleInput,
+                {
+                  color: colors.textPrimary,
+                  backgroundColor: colors.surfaceElevated,
+                  borderColor: colors.border,
+                  height: 80,
+                  textAlignVertical: 'top',
+                  paddingTop: 12,
+                  marginBottom: spacing[4],
+                },
+              ]}
             />
-
-            <Input
-              label="Max Daily Trades limit"
-              placeholder="3"
-              value={form.maxDailyTrades}
-              onChangeText={(v) => setForm((p) => ({ ...p, maxDailyTrades: v }))}
-              keyboardType="numeric"
-            />
-
-            <Input
-              label="Target Discipline Score (0-100)"
-              placeholder="75"
-              value={form.targetConsistency}
-              onChangeText={(v) => setForm((p) => ({ ...p, targetConsistency: v }))}
-              keyboardType="numeric"
-            />
-
+            <Text style={[typography.label, { color: colors.textSecondary, marginBottom: 10 }]}>Category</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: spacing[5] }}>
+              {(Object.keys(RULE_CATEGORY_META) as DailyRule['category'][]).map((cat) => {
+                const meta = RULE_CATEGORY_META[cat];
+                const isSelected = ruleForm.category === cat;
+                return (
+                  <TouchableOpacity
+                    key={cat}
+                    onPress={() => setRuleForm((p) => ({ ...p, category: cat }))}
+                    style={[
+                      styles.categoryChip,
+                      {
+                        backgroundColor: isSelected ? meta.color + '22' : colors.surfaceElevated,
+                        borderColor: isSelected ? meta.color : colors.border,
+                      },
+                    ]}
+                  >
+                    <Ionicons name={meta.icon} size={14} color={isSelected ? meta.color : colors.textSecondary} />
+                    <Text style={[typography.caption, { color: isSelected ? meta.color : colors.textSecondary, fontWeight: isSelected ? '700' : '500' }]}>
+                      {meta.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
             <Button
-              label="Save Goal"
-              onPress={handleSaveGoal}
-              style={{ marginTop: spacing[4], marginBottom: spacing[6] }}
+              label={editingRule ? 'Update Rule' : 'Add Rule'}
+              onPress={handleAddRule}
+              style={{ marginTop: spacing[2], marginBottom: spacing[6] }}
             />
           </ScrollView>
         </View>
       </Modal>
+
+      {/* ─── Presets Modal ─── */}
+      <Modal visible={showPresetsModal} animationType="slide" onRequestClose={() => setShowPresetsModal(false)}>
+        <View style={[styles.modalContainer, { backgroundColor: colors.background, paddingTop: Platform.OS === 'ios' ? 50 : 20 }]}>
+          <View style={[styles.modalHeader, { paddingHorizontal: spacing[5], paddingBottom: spacing[4] }]}>
+            <Text style={[typography.h2, { color: colors.textPrimary }]}>Preset Rules</Text>
+            <TouchableOpacity onPress={() => setShowPresetsModal(false)}>
+              <Ionicons name="close" size={28} color={colors.textPrimary} />
+            </TouchableOpacity>
+          </View>
+          <Text style={[typography.body, { color: colors.textTertiary, paddingHorizontal: spacing[5], marginBottom: spacing[3] }]}>
+            Tap '+' to add a preset rule to your daily checklist.
+          </Text>
+          <ScrollView contentContainerStyle={{ paddingHorizontal: spacing[5] }}>
+            {PRESET_RULES.map((preset, idx) => {
+              const meta = RULE_CATEGORY_META[preset.category];
+              const ruleColor = preset.color || meta.color;
+              const ruleIcon = preset.icon || meta.icon;
+              const alreadyAdded = rules.some((r) => r.title === preset.title);
+              return (
+                <Card key={idx} style={{ marginBottom: spacing[2], borderLeftWidth: 3, borderLeftColor: ruleColor }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <View style={{ width: 34, height: 34, borderRadius: 8, backgroundColor: ruleColor + '18', alignItems: 'center', justifyContent: 'center' }}>
+                      <Ionicons name={ruleIcon} size={18} color={ruleColor} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[typography.label, { color: colors.textPrimary, fontWeight: '600' }]}>{preset.title}</Text>
+                      {preset.description && (
+                        <Text style={[typography.caption, { color: colors.textTertiary, marginTop: 2, lineHeight: 16 }]}>{preset.description}</Text>
+                      )}
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => handleAddPresets(preset)}
+                      disabled={alreadyAdded}
+                      style={[
+                        styles.presetAddBtn,
+                        { backgroundColor: alreadyAdded ? colors.surfaceElevated : ruleColor + '22', borderColor: alreadyAdded ? colors.border : ruleColor },
+                      ]}
+                    >
+                      <Ionicons name={alreadyAdded ? 'checkmark' : 'add'} size={18} color={alreadyAdded ? colors.textTertiary : ruleColor} />
+                    </TouchableOpacity>
+                  </View>
+                </Card>
+              );
+            })}
+            <View style={{ height: spacing[6] }} />
+          </ScrollView>
+        </View>
+      </Modal>
+
 
       {/* Account Targets Edit Modal */}
       <Modal
@@ -851,60 +1300,7 @@ export const GoalsScreen: React.FC = () => {
         </View>
       </Modal>
 
-      {/* Custom Month Picker Modal */}
-      <Modal
-        visible={showMonthPicker}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowMonthPicker(false)}
-      >
-        <View style={{ flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.6)', justifyContent: 'center', alignItems: 'center', padding: spacing[5] }}>
-          <View style={{ width: '100%', backgroundColor: colors.surface, borderRadius: radii.xl, padding: spacing[5] }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing[4] }}>
-              <Text style={[typography.h3, { color: colors.textPrimary }]}>Select Month & Year</Text>
-              <TouchableOpacity onPress={() => setShowMonthPicker(false)}>
-                <Ionicons name="close" size={24} color={colors.textPrimary} />
-              </TouchableOpacity>
-            </View>
 
-            {/* Year Selector */}
-            <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 24, marginBottom: spacing[4] }}>
-              <TouchableOpacity onPress={() => setSelectedYear((y) => y - 1)}>
-                <Ionicons name="chevron-back" size={24} color={colors.primary} />
-              </TouchableOpacity>
-              <Text style={[typography.h2, { color: colors.textPrimary, fontSize: 20 }]}>{selectedYear}</Text>
-              <TouchableOpacity onPress={() => setSelectedYear((y) => y + 1)}>
-                <Ionicons name="chevron-forward" size={24} color={colors.primary} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Months Grid */}
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'space-between' }}>
-              {MONTHS.map((m, idx) => {
-                const isSelected = form.month === `${selectedYear}-${String(idx + 1).padStart(2, '0')}`;
-                return (
-                  <TouchableOpacity
-                    key={m}
-                    onPress={() => handleSelectMonth(idx)}
-                    style={{
-                      width: '30%',
-                      paddingVertical: spacing[2],
-                      backgroundColor: isSelected ? colors.primary : colors.surfaceElevated,
-                      borderRadius: radii.md,
-                      alignItems: 'center',
-                      marginBottom: 4,
-                    }}
-                  >
-                    <Text style={[typography.caption, { color: isSelected ? '#fff' : colors.textPrimary, fontWeight: '600' }]} numberOfLines={1}>
-                      {m.substring(0, 3)}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 };
@@ -929,8 +1325,10 @@ const styles = StyleSheet.create({
   },
   tabSelectorButton: {
     flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 4,
   },
   scrollContainer: {
     paddingVertical: 8,
@@ -963,5 +1361,53 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  ruleCard: {
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+  ruleToggle: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+    flexShrink: 0,
+  },
+  rulesActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 11,
+    paddingHorizontal: 16,
+    borderRadius: 100,
+  },
+  ruleInput: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    height: 48,
+    fontSize: 15,
+  },
+  categoryChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 100,
+    borderWidth: 1,
+  },
+  presetAddBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
   },
 });

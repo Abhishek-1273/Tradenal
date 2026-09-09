@@ -2,6 +2,8 @@ import mongoose from 'mongoose';
 import { accountRepository } from '../../repositories/account.repository';
 import { AppError } from '../../middleware/error.middleware';
 import { IAccount } from '../../models/Account.model';
+import { Trade } from '../../models/Trade.model';
+import { deleteFromCloudinary } from '../../middleware/upload.middleware';
 import { CreateAccountInput, UpdateAccountInput } from './account.schema';
 
 class AccountService {
@@ -79,6 +81,15 @@ class AccountService {
         400
       );
     }
+
+    // Clean up all trades and screenshots associated with this account to prevent orphan records
+    const trades = await Trade.find({ accountId: new mongoose.Types.ObjectId(accountId) });
+    for (const trade of trades) {
+      if (trade.screenshots && trade.screenshots.length > 0) {
+        await Promise.allSettled(trade.screenshots.map((s) => deleteFromCloudinary(s.publicId)));
+      }
+    }
+    await Trade.deleteMany({ accountId: new mongoose.Types.ObjectId(accountId) });
 
     await accountRepository.deleteById(accountId);
   }

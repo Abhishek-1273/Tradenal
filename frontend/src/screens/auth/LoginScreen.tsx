@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,7 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
-  Animated,
+  Image,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useForm, Controller } from 'react-hook-form';
@@ -40,6 +40,10 @@ export const LoginScreen: React.FC = () => {
   const passwordRef = useRef<TextInput>(null);
   const insets = useSafeAreaInsets();
 
+  useEffect(() => {
+    clearError();
+  }, []);
+
   const {
     control,
     handleSubmit,
@@ -54,154 +58,169 @@ export const LoginScreen: React.FC = () => {
     try {
       await login(data);
     } catch {
-      // Error shown via authError
+      // Error handled via authStore.error
     }
   };
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
-      {/* Background gradient accent */}
+      {/* Top Ambient Glow across entire screen width */}
       <LinearGradient
-        colors={['rgba(99,102,241,0.15)', 'transparent']}
-        style={styles.gradientAccent}
-        start={{ x: 0.5, y: 0 }}
-        end={{ x: 0.5, y: 1 }}
+        colors={['rgba(99, 102, 241, 0.22)', 'rgba(16, 185, 129, 0.08)', 'transparent']}
+        style={[styles.ambientTopGlow, { height: 380 }]}
         pointerEvents="none"
       />
 
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
           contentContainerStyle={[
-            styles.scroll,
-            { paddingTop: insets.top + 40, paddingBottom: insets.bottom + 24 },
+            styles.scrollContent,
+            {
+              paddingTop: Math.max(insets.top, 20) + 16,
+              paddingBottom: Math.max(insets.bottom, 20) + 16,
+            },
           ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          bounces={false}
         >
-          {/* Logo / Brand */}
-          <View style={styles.brand}>
-            <LinearGradient
-              colors={[colors.primaryDark, colors.primary]}
-              style={[styles.logoBox, { borderRadius: radii.xl }]}
-            >
-              <Ionicons name="trending-up" size={32} color="#fff" />
-            </LinearGradient>
-            <Text style={[typography.displayMd, { color: colors.textPrimary, marginTop: spacing[4] }]}>
-              Tradenal
-            </Text>
-            <Text style={[typography.body, { color: colors.textTertiary, marginTop: spacing[1] }]}>
-              Track. Analyse. Improve.
-            </Text>
-          </View>
+          <View style={styles.centerContainer}>
+            {/* Top Section: Brand & Welcome Header */}
+            <View style={styles.topSection}>
+              {/* Logo & Brand */}
+              <View style={styles.brandRow}>
+                <View style={[styles.logoHalo, { backgroundColor: colors.primary + '18' }]}>
+                  <Image
+                    source={require('../../../assets/icon.png')}
+                    style={{ width: 48, height: 48, borderRadius: 14 }}
+                    resizeMode="cover"
+                  />
+                </View>
 
-          {/* Card */}
-          <View
-            style={[
-              styles.card,
-              {
-                backgroundColor: colors.surface,
-                borderRadius: radii['2xl'],
-                borderColor: colors.border,
-                borderWidth: 1,
-                marginTop: spacing[8],
-                padding: spacing[6],
-              },
-            ]}
-          >
-            <Text style={[typography.h2, { color: colors.textPrimary, marginBottom: spacing[5] }]}>
-              Welcome back
-            </Text>
+                <View style={[styles.terminalBadge, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
+                  <View style={[styles.liveDot, { backgroundColor: colors.success }]} />
+                  <Text style={[styles.terminalBadgeText, { color: colors.textSecondary }]}>v2.0 TERMINAL</Text>
+                </View>
+              </View>
 
-            {/* Auth Error */}
-            {authError && (
-              <View
-                style={[
-                  styles.errorBanner,
-                  { backgroundColor: colors.errorSubtle, borderRadius: radii.md, marginBottom: spacing[4] },
-                ]}
-              >
-                <Ionicons name="alert-circle" size={16} color={colors.error} />
-                <Text style={[typography.bodySm, { color: colors.error, marginLeft: 8, flex: 1 }]}>
-                  {authError}
+              {/* Title & Tagline */}
+              <View style={{ marginTop: 16 }}>
+                <Text style={[typography.h1, { color: colors.textPrimary, letterSpacing: -0.6, fontSize: 26 }]}>
+                  Welcome back
+                </Text>
+                <Text style={{ fontSize: 13, color: colors.textTertiary, marginTop: 4, lineHeight: 18 }}>
+                  Sign in to your trading journal & performance dashboard
                 </Text>
               </View>
-            )}
+            </View>
 
-            {/* Email */}
-            <Controller
-              control={control}
-              name="email"
-              render={({ field: { onChange, onBlur, value } }) => (
-                <Input
-                  label="Email"
-                  placeholder="you@example.com"
-                  value={value}
-                  onChangeText={(t) => { onChange(t); clearError(); }}
-                  onBlur={onBlur}
-                  error={errors.email?.message}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoComplete="email"
-                  returnKeyType="next"
-                  onSubmitEditing={() => passwordRef.current?.focus()}
-                  leftIcon={<Ionicons name="mail-outline" size={18} color={colors.textTertiary} />}
-                />
-              )}
-            />
+            {/* Form Section: Tightly Grouped Clean Inputs */}
+            <View style={[styles.formSection, { marginTop: 22 }]}>
+              {/* Error Banner */}
+              {authError ? (
+                <View
+                  style={[
+                    styles.errorBanner,
+                    {
+                      backgroundColor: colors.errorSubtle,
+                      borderColor: colors.error + '50',
+                      borderRadius: radii.lg,
+                      marginBottom: 14,
+                    },
+                  ]}
+                >
+                  <Ionicons name="alert-circle" size={18} color={colors.error} />
+                  <Text style={[typography.bodySm, { color: colors.error, marginLeft: 8, flex: 1, fontWeight: '600' }]}>
+                    {authError}
+                  </Text>
+                </View>
+              ) : null}
 
-            {/* Password */}
-            <Controller
-              control={control}
-              name="password"
-              render={({ field: { onChange, onBlur, value } }) => (
-                <Input
-                  ref={passwordRef}
-                  label="Password"
-                  placeholder="Your password"
-                  value={value}
-                  onChangeText={(t) => { onChange(t); clearError(); }}
-                  onBlur={onBlur}
-                  error={errors.password?.message}
-                  isPassword
-                  returnKeyType="done"
-                  onSubmitEditing={handleSubmit(onSubmit)}
-                  leftIcon={<Ionicons name="lock-closed-outline" size={18} color={colors.textTertiary} />}
-                />
-              )}
-            />
+              {/* Email */}
+              <Controller
+                control={control}
+                name="email"
+                render={({ field: { onChange, onBlur, value } }) => (
+                  <Input
+                    label="Email Address"
+                    placeholder="name@trading.com"
+                    value={value}
+                    onChangeText={(t) => {
+                      onChange(t);
+                      clearError();
+                    }}
+                    onBlur={onBlur}
+                    error={errors.email?.message}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoComplete="email"
+                    returnKeyType="next"
+                    onSubmitEditing={() => passwordRef.current?.focus()}
+                    leftIcon={<Ionicons name="mail-outline" size={18} color={colors.textTertiary} />}
+                    containerStyle={{ marginBottom: 12 }}
+                  />
+                )}
+              />
 
-            {/* Forgot Password */}
-            <TouchableOpacity
-              onPress={() => navigation.navigate('ForgotPassword')}
-              style={styles.forgotBtn}
-            >
-              <Text style={[typography.label, { color: colors.primary }]}>
-                Forgot password?
+              {/* Password */}
+              <Controller
+                control={control}
+                name="password"
+                render={({ field: { onChange, onBlur, value } }) => (
+                  <Input
+                    ref={passwordRef}
+                    label="Password"
+                    placeholder="Enter your password"
+                    value={value}
+                    onChangeText={(t) => {
+                      onChange(t);
+                      clearError();
+                    }}
+                    onBlur={onBlur}
+                    error={errors.password?.message}
+                    isPassword
+                    returnKeyType="done"
+                    onSubmitEditing={handleSubmit(onSubmit)}
+                    leftIcon={<Ionicons name="lock-closed-outline" size={18} color={colors.textTertiary} />}
+                    containerStyle={{ marginBottom: 6 }}
+                  />
+                )}
+              />
+
+              {/* Forgot Password */}
+              <TouchableOpacity
+                onPress={() => navigation.navigate('ForgotPassword')}
+                activeOpacity={0.7}
+                style={styles.forgotBtn}
+              >
+                <Text style={[typography.labelSm, { color: colors.primary, fontWeight: '700' }]}>
+                  Forgot password?
+                </Text>
+              </TouchableOpacity>
+
+              {/* Submit Button */}
+              <Button
+                label={isPending ? 'Signing In...' : 'Sign In to Terminal'}
+                onPress={handleSubmit(onSubmit)}
+                loading={isPending}
+                style={{ marginTop: 10 }}
+              />
+            </View>
+
+            {/* Bottom Switcher: Clean and Close */}
+            <View style={styles.bottomFooter}>
+              <Text style={[typography.body, { color: colors.textTertiary, fontSize: 13 }]}>
+                Don't have an account yet?{' '}
               </Text>
-            </TouchableOpacity>
-
-            {/* Submit */}
-            <Button
-              label="Sign In"
-              onPress={handleSubmit(onSubmit)}
-              loading={isPending}
-              style={{ marginTop: spacing[2] }}
-            />
-          </View>
-
-          {/* Register link */}
-          <View style={[styles.footer, { marginTop: spacing[6] }]}>
-            <Text style={[typography.body, { color: colors.textTertiary }]}>
-              Don't have an account?{' '}
-            </Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Register')}>
-              <Text style={[typography.body, { color: colors.primary, fontWeight: '600' }]}>
-                Create one
-              </Text>
-            </TouchableOpacity>
+              <TouchableOpacity onPress={() => navigation.navigate('Register')} activeOpacity={0.7}>
+                <Text style={[typography.body, { color: colors.primary, fontWeight: '800', fontSize: 13 }]}>
+                  Create Account
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -210,48 +229,89 @@ export const LoginScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
-  flex: { flex: 1 },
-  gradientAccent: {
+  root: {
+    flex: 1,
+  },
+  flex: {
+    flex: 1,
+  },
+  ambientTopGlow: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    height: 300,
+    zIndex: 0,
   },
-  scroll: {
+  scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: 24,
-  },
-  brand: {
-    alignItems: 'center',
-  },
-  logoBox: {
-    width: 72,
-    height: 72,
-    alignItems: 'center',
+    paddingHorizontal: 20,
     justifyContent: 'center',
   },
-  card: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 10,
+  centerContainer: {
+    width: '100%',
+    paddingVertical: 10,
+  },
+  topSection: {
+    width: '100%',
+  },
+  brandRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  logoHalo: {
+    padding: 6,
+    borderRadius: 20,
+  },
+  logoBox: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#6366F1',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  terminalBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 6,
+  },
+  terminalBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  formSection: {
+    width: '100%',
   },
   errorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
+    borderWidth: 1,
   },
   forgotBtn: {
     alignSelf: 'flex-end',
-    marginBottom: 20,
-    marginTop: -4,
+    marginBottom: 8,
+    paddingVertical: 4,
   },
-  footer: {
+  bottomFooter: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: 24,
+    paddingVertical: 4,
   },
 });

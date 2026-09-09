@@ -49,7 +49,7 @@ export const TimeField: React.FC<TimeFieldProps> = ({ label, value, onChange, er
           },
         ]}
       >
-        <Ionicons name="time-outline" size={17} color={colors.primary} />
+        <Ionicons name="time-outline" size={17} color={colors.textPrimary} />
         <Text
           numberOfLines={1}
           style={[

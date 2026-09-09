@@ -12,7 +12,6 @@ import { useTheme } from '../../theme';
 import { Trade } from '../../types';
 import { Badge } from '../common/Badge';
 import {
-  formatRR,
   formatDate,
   getResultColor,
   getSetupLabel,
@@ -30,18 +29,23 @@ interface TradeCardProps {
   hideDate?: boolean;
 }
 
-export const TradeCard: React.FC<TradeCardProps> = ({
+export const TradeCard: React.FC<TradeCardProps> = React.memo(({
   trade,
   onPress,
   onFavorite,
   style,
   hideDate = false,
 }) => {
-  const { colors, typography, radii, spacing } = useTheme();
+  const { colors, typography, radii, spacing, isDark } = useTheme();
+  const activeAccount = useAccountStore((s) => s.activeAccount);
 
   const resultColor = getResultColor(trade.result, colors);
   const isWin = trade.result === 'win' || trade.result === 'partialWin';
+  const isLoss = trade.result === 'loss';
   const rMultiple = trade.rMultiple;
+  const currency = activeAccount?.currency ?? 'USD';
+
+  const effectivePnL = trade.pnlAmount ?? trade.pnl;
 
   return (
     <TouchableOpacity
@@ -54,141 +58,246 @@ export const TradeCard: React.FC<TradeCardProps> = ({
           borderRadius: radii.xl,
           borderWidth: 1,
           borderColor: colors.border,
-          overflow: 'hidden',
           marginBottom: spacing[3],
         },
         style,
       ]}
     >
-      {/* Background Gradient Glow */}
-      <LinearGradient
-        colors={[resultColor + '0a', 'transparent']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
-
-      {/* Result accent stripe */}
+      {/* Left Edge Indicator */}
       <View
         style={[
-          styles.stripe,
-          { backgroundColor: resultColor },
+          styles.neonStripe,
+          {
+            backgroundColor: resultColor,
+          },
         ]}
       />
 
       <View style={[styles.content, { padding: spacing[4] }]}>
-        {/* Top row */}
+        {/* Top Header Row */}
         <View style={styles.topRow}>
-          <View style={styles.pairBlock}>
-            <Text style={[typography.h3, { color: colors.textPrimary }]}>
-              {trade.pair}
-            </Text>
-            <View style={[styles.typeTag, { marginTop: 3 }]}>
-              <Badge
-                label={trade.tradeType}
-                variant={trade.tradeType === 'buy' ? 'buy' : 'sell'}
-                size="sm"
-              />
-              {trade.setup && (
-                <Badge
-                  label={getSetupLabel(trade.setup)}
-                  variant="neutral"
-                  size="sm"
-                  style={{ marginLeft: spacing[1.5] }}
+          {/* Pair & Direction */}
+          <View style={styles.leftHeader}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={[styles.pairText, { color: colors.textPrimary }]}>
+                {trade.pair}
+              </Text>
+              <View style={[styles.directionBadge, { backgroundColor: trade.tradeType === 'buy' ? colors.successSubtle : colors.errorSubtle, borderColor: trade.tradeType === 'buy' ? colors.success + '40' : colors.error + '40' }]}>
+                <Ionicons
+                  name={trade.tradeType === 'buy' ? 'trending-up' : 'trending-down'}
+                  size={11}
+                  color={trade.tradeType === 'buy' ? colors.success : colors.error}
+                  style={{ marginRight: 3 }}
                 />
+                <Text
+                  style={[
+                    styles.directionText,
+                    { color: trade.tradeType === 'buy' ? colors.success : colors.error },
+                  ]}
+                >
+                  {trade.tradeType.toUpperCase()}
+                </Text>
+              </View>
+
+              {/* Plan compliance badge beside BUY/SELL */}
+              {trade.followedPlan ? (
+                <View style={[styles.planBadge, { backgroundColor: colors.successSubtle, marginLeft: 6 }]}>
+                  <Ionicons name="checkmark-sharp" size={10} color={colors.success} />
+                  <Text style={[styles.planText, { color: colors.success }]}>Plan</Text>
+                </View>
+              ) : (
+                <View style={[styles.planBadge, { backgroundColor: colors.errorSubtle, marginLeft: 6, borderColor: colors.error + '40', borderWidth: 1 }]}>
+                  <Ionicons name="alert-circle" size={10} color={colors.error} />
+                  <Text style={[styles.planText, { color: colors.error, fontWeight: '700' }]}>Rule Broken</Text>
+                </View>
               )}
+            </View>
+
+            {/* Setup & Session badges */}
+            <View style={styles.subTagRow}>
+              {trade.strategy && (
+                <View
+                  style={[
+                    styles.microChip,
+                    {
+                      backgroundColor: isDark ? 'rgba(59, 130, 246, 0.15)' : '#EFF6FF',
+                      borderColor: isDark ? 'rgba(59, 130, 246, 0.3)' : '#BFDBFE',
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name="git-network-outline"
+                    size={10}
+                    color={isDark ? '#60A5FA' : '#2563EB'}
+                    style={{ marginRight: 3 }}
+                  />
+                  <Text
+                    style={[
+                      styles.microChipText,
+                      {
+                        color: isDark ? '#93C5FD' : '#1D4ED8',
+                        fontWeight: '700',
+                      },
+                    ]}
+                  >
+                    {trade.strategy}
+                  </Text>
+                </View>
+              )}
+              {trade.setup && (
+                <View style={[styles.microChip, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
+                  <Text style={[styles.microChipText, { color: colors.textSecondary }]}>
+                    {getSetupLabel(trade.setup)}
+                  </Text>
+                </View>
+              )}
+              <View style={[styles.microChip, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
+                <Ionicons name="time-outline" size={10} color={colors.textTertiary} style={{ marginRight: 3 }} />
+                <Text style={[styles.microChipText, { color: colors.textTertiary }]}>
+                  {getSessionLabel(trade.session)}
+                </Text>
+              </View>
             </View>
           </View>
 
-          <View style={styles.rightBlock}>
-            {/* R-Multiple */}
-            <Text
+          {/* Right Metrics: Net R & PnL */}
+          <View style={styles.rightMetrics}>
+            {/* R-Multiple glowing chip */}
+            <View
               style={[
-                typography.numericSm,
-                { color: resultColor },
+                styles.rMultipleChip,
+                {
+                  backgroundColor: resultColor + '18',
+                  borderColor: resultColor + '50',
+                },
               ]}
             >
-              {rMultiple !== undefined
-                ? `${rMultiple >= 0 ? '+' : ''}${rMultiple.toFixed(2)}R`
-                : '—'}
-            </Text>
-            {typeof trade.pnlAmount === 'number' && (
               <Text
                 style={[
-                  typography.caption,
-                  { color: resultColor, fontWeight: '600', marginTop: 2 },
+                  styles.rMultipleText,
+                  { color: resultColor },
                 ]}
               >
-                {formatPnL(trade.pnlAmount, useAccountStore.getState().activeAccount?.currency)}
+                {rMultiple !== undefined && rMultiple !== null
+                  ? `${rMultiple >= 0 ? '+' : ''}${rMultiple.toFixed(2)}R`
+                  : trade.result === 'win' || trade.result === 'partialWin'
+                  ? '+1.00R'
+                  : trade.result === 'loss'
+                  ? '-1.00R'
+                  : '0.00R'}
+              </Text>
+            </View>
+
+            {/* Monetary PnL */}
+            {typeof effectivePnL === 'number' && (
+              <Text
+                style={[
+                  styles.pnlText,
+                  { color: resultColor },
+                ]}
+                numberOfLines={1}
+              >
+                {formatPnL(effectivePnL, currency)}
               </Text>
             )}
-            <Badge
-              label={trade.result}
-              variant={trade.result as any}
-              size="sm"
-              style={{ marginTop: 4, alignSelf: 'flex-end' }}
-            />
           </View>
         </View>
 
-        {/* Stats row */}
-        <View style={[styles.statsRow, { marginTop: spacing[3], paddingTop: spacing[3], borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}>
-          <StatItem
-            label="Entry"
-            value={trade.entryPrice.toFixed(trade.entryPrice < 10 ? 5 : 2)}
-          />
-          <StatItem label="RR" value={formatRR(trade.riskReward)} />
-          <StatItem
-            label="Session"
-            value={getSessionLabel(trade.session)}
-          />
-          <StatItem
-            label="Duration"
-            value={formatDuration(trade.tradeDurationMinutes)}
-          />
+        {/* Execution Stats Matrix */}
+        <View style={[styles.statsRow, { borderTopColor: colors.border, borderBottomColor: colors.border }]}>
+          <View style={styles.statCol}>
+            <Text style={[styles.statLabel, { color: colors.textTertiary }]}>ENTRY</Text>
+            <Text
+              style={[styles.statValue, { color: colors.textPrimary }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+            >
+              {trade.entryPrice.toFixed(trade.entryPrice < 10 ? 5 : 2)}
+            </Text>
+          </View>
+
+          <View style={styles.statCol}>
+            <Text style={[styles.statLabel, { color: colors.textTertiary }]}>EXIT</Text>
+            <Text
+              style={[styles.statValue, { color: trade.exitPrice ? colors.textPrimary : colors.textTertiary }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+            >
+              {trade.exitPrice ? trade.exitPrice.toFixed(trade.exitPrice < 10 ? 5 : 2) : '—'}
+            </Text>
+          </View>
+
+          <View style={styles.statCol}>
+            <Text style={[styles.statLabel, { color: colors.textTertiary }]}>SIZE</Text>
+            <Text
+              style={[styles.statValue, { color: colors.textSecondary }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+            >
+              {trade.lotSize}L
+            </Text>
+          </View>
+
+          <View style={styles.statCol}>
+            <Text style={[styles.statLabel, { color: colors.textTertiary }]}>HOLD TIME</Text>
+            <Text
+              style={[styles.statValue, { color: colors.textSecondary }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+            >
+              {formatDuration(trade.tradeDurationMinutes)}
+            </Text>
+          </View>
         </View>
 
-        {/* Bottom row */}
-        <View style={[styles.bottomRow, { marginTop: spacing[2] }]}>
-          {!hideDate ? (
-            <Text style={[typography.caption, { color: colors.textTertiary }]}>
-              {formatDate(trade.tradeDate, 'DD MMM YYYY')}
-            </Text>
-          ) : (
-            <View />
-          )}
+        {/* Card Footer: Date, Psychology & Tags */}
+        <View style={styles.footerRow}>
+          {/* Left: Date & Emotion */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1 }}>
+            {!hideDate && (
+              <Text style={[styles.dateText, { color: colors.textTertiary }]}>
+                {formatDate(trade.tradeDate, 'DD MMM YYYY')}
+              </Text>
+            )}
 
-          <View style={styles.bottomRight}>
-            {trade.mistakes.length > 0 && (
-              <View style={[styles.mistakeTag, { backgroundColor: colors.errorSubtle, borderRadius: radii.sm }]}>
-                <Ionicons name="warning-outline" size={11} color={colors.error} />
-                <Text style={[typography.caption, { color: colors.error, marginLeft: 3 }]}>
-                  {trade.mistakes.length} mistake{trade.mistakes.length > 1 ? 's' : ''}
+            {trade.emotionBefore && (
+              <View style={[styles.planBadge, { backgroundColor: colors.surfaceElevated }]}>
+                <Text style={{ fontSize: 10, color: colors.textSecondary, textTransform: 'capitalize' }}>
+                  {trade.emotionBefore}
                 </Text>
               </View>
             )}
-            {!trade.followedPlan && (
-              <View style={[styles.mistakeTag, { backgroundColor: colors.warningSubtle, borderRadius: radii.sm, marginLeft: spacing[1.5] }]}>
-                <Ionicons name="close-circle-outline" size={11} color={colors.warning} />
-                <Text style={[typography.caption, { color: colors.warning, marginLeft: 3 }]}>
-                  Off-plan
-                </Text>
-              </View>
-            )}
+          </View>
+
+          {/* Right: Screenshots, Mistakes & Favorite */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             {trade.screenshots.length > 0 && (
-              <View style={{ marginLeft: spacing[2] }}>
-                <Ionicons name="image-outline" size={14} color={colors.textTertiary} />
+              <View style={[styles.metaPill, { backgroundColor: colors.surfaceElevated }]}>
+                <Ionicons name="image" size={11} color={colors.textSecondary} style={{ marginRight: 3 }} />
+                <Text style={[styles.metaPillText, { color: colors.textSecondary }]}>
+                  {trade.screenshots.length}
+                </Text>
               </View>
             )}
+
+            {trade.mistakes.length > 0 && (
+              <View style={[styles.metaPill, { backgroundColor: colors.errorSubtle }]}>
+                <Ionicons name="warning" size={11} color={colors.error} style={{ marginRight: 3 }} />
+                <Text style={[styles.metaPillText, { color: colors.error }]}>
+                  {trade.mistakes.length}
+                </Text>
+              </View>
+            )}
+
             {onFavorite && (
               <TouchableOpacity
                 onPress={onFavorite}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                style={{ marginLeft: spacing[2] }}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                style={styles.favBtn}
               >
                 <Ionicons
                   name={trade.isFavorite ? 'star' : 'star-outline'}
-                  size={16}
+                  size={17}
                   color={trade.isFavorite ? colors.warning : colors.textTertiary}
                 />
               </TouchableOpacity>
@@ -198,31 +307,25 @@ export const TradeCard: React.FC<TradeCardProps> = ({
       </View>
     </TouchableOpacity>
   );
-};
+});
 
-const StatItem: React.FC<{ label: string; value: string }> = ({ label, value }) => {
-  const { colors, typography } = useTheme();
-  return (
-    <View style={styles.statItem}>
-      <Text style={[typography.caption, { color: colors.textTertiary }]}>{label}</Text>
-      <Text style={[typography.label, { color: colors.textSecondary, marginTop: 2 }]}>
-        {value}
-      </Text>
-    </View>
-  );
-};
+TradeCard.displayName = 'TradeCard';
 
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
+    position: 'relative',
+    overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
   },
-  stripe: {
-    width: 5,
+  neonStripe: {
+    width: 4,
+    borderTopLeftRadius: 4,
+    borderBottomLeftRadius: 4,
   },
   content: {
     flex: 1,
@@ -232,34 +335,120 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
   },
-  pairBlock: {},
-  typeTag: {
+  leftHeader: {
+    flex: 1,
+  },
+  pairText: {
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  directionBadge: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    marginLeft: 8,
   },
-  rightBlock: {
+  directionText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+  },
+  subTagRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 6,
+  },
+  microChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  microChipText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  rightMetrics: {
     alignItems: 'flex-end',
+  },
+  rMultipleChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  rMultipleText: {
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+  },
+  pnlText: {
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 3,
   },
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    paddingVertical: 10,
+    marginTop: 12,
+    marginBottom: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  statItem: {
+  statCol: {
     flex: 1,
   },
-  bottomRow: {
+  statLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    marginBottom: 2,
+  },
+  statValue: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  footerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  bottomRight: {
+  dateText: {
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  planBadge: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
   },
-  mistakeTag: {
+  planText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  metaPill: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 6,
-    paddingVertical: 3,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  metaPillText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  favBtn: {
+    padding: 2,
   },
 });

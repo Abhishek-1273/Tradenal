@@ -36,22 +36,23 @@ class StatsService {
         break;
     }
 
-    const trades = await tradeRepository.findForStats({
-      userId,
-      accountId: resolvedAccountId,
-      startDate,
-      endDate: now.endOf('day').toDate(),
-    });
+    const [trades, equityCurve, recentNotes] = await Promise.all([
+      tradeRepository.findForStats({
+        userId,
+        accountId: resolvedAccountId,
+        startDate,
+        endDate: now.endOf('day').toDate(),
+      }),
+      tradeRepository.getEquityCurve(
+        userId,
+        startDate,
+        now.endOf('day').toDate(),
+        resolvedAccountId
+      ),
+      tradeRepository.findRecentNotes(userId, resolvedAccountId, 3),
+    ]);
 
     const stats = calculateStats(trades);
-
-    // Equity curve
-    const equityCurve = await tradeRepository.getEquityCurve(
-      userId,
-      startDate,
-      now.endOf('day').toDate(),
-      resolvedAccountId
-    );
 
     // Win/Loss breakdown for pie chart
     const winLossData = [
@@ -78,7 +79,6 @@ class StatsService {
     }));
 
     const disciplineScore = calculateDisciplineScore(disciplineInputs);
-    const recentNotes = await tradeRepository.findRecentNotes(userId, resolvedAccountId, 3);
 
     return {
       stats,
@@ -133,11 +133,11 @@ class StatsService {
     const emotionBreakdown = this.getEmotionBreakdown(trades);
     const mistakesBreakdown = this.getMistakesBreakdown(trades);
 
-    // Monthly performance
-    const monthlyPerformance = await this.getMonthlyPerformance(userId, resolvedAccountId);
-
-    // Weekly performance
-    const weeklyPerformance = await this.getWeeklyPerformance(userId, resolvedAccountId);
+    // Monthly and Weekly performance in parallel
+    const [monthlyPerformance, weeklyPerformance] = await Promise.all([
+      this.getMonthlyPerformance(userId, resolvedAccountId),
+      this.getWeeklyPerformance(userId, resolvedAccountId),
+    ]);
 
     // Best/worst pair
     const sortedByWinRate = [...byPair].filter((p) => p.totalTrades >= 3);

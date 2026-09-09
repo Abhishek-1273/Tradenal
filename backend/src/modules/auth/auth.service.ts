@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import nodemailer from 'nodemailer';
 import { userRepository } from '../../repositories/user.repository';
+import { accountRepository } from '../../repositories/account.repository';
 import {
   generateAccessToken,
   generateRefreshToken,
@@ -43,12 +44,23 @@ class AuthService {
       password: input.password,
     });
 
+    // Seed initial default trading account for the new user
+    await accountRepository.create({
+      userId: user._id,
+      name: 'Main Trading Account',
+      accountType: 'personal',
+      currency: 'USD',
+      startingBalance: 5000,
+      isDefault: true,
+      status: 'active',
+    });
+
     const accessToken = generateAccessToken(user._id.toString(), user.email);
     const refreshToken = generateRefreshToken(user._id.toString(), user.email);
 
     await userRepository.addRefreshToken(user._id.toString(), refreshToken);
 
-    logger.info(`New user registered: ${user.email}`);
+    logger.info(`New user registered with default account: ${user.email}`);
 
     return {
       user: user.toSafeObject(),
@@ -257,7 +269,11 @@ class AuthService {
     token: string
   ): Promise<void> {
     if (!env.SMTP_HOST) {
-      logger.warn('SMTP not configured. Reset token:', token);
+      if (env.NODE_ENV !== 'production') {
+        logger.warn(`SMTP not configured. Development reset token: ${token}`);
+      } else {
+        logger.warn('SMTP not configured. Password reset email could not be delivered.');
+      }
       return;
     }
 

@@ -27,6 +27,7 @@ const envSchema = z.object({
 
   OPENAI_API_KEY: z.string().optional(),
   OPENAI_BASE_URL: z.string().optional(),
+  OPENAI_MODEL: z.string().optional(),
 
   CLIENT_URL: z.string().default('http://localhost:3000'),
 });

@@ -28,7 +28,7 @@ export type AppStackParamList = {
   AIReview: undefined;
   Goals: undefined;
   Psychology: undefined;
-  Settings: undefined;
+  Settings: { section?: 'main' | 'password' | 'defaults' } | undefined;
   CalendarDay: { date: string };
   Export: undefined;
   Accounts: undefined;

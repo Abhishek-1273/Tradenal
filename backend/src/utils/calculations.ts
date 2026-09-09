@@ -23,19 +23,45 @@ export const calculateRiskReward = (
 };
 
 /**
+ * Contract sizes for different asset classes:
+ * Forex standard: 100,000 units
+ * Gold (XAUUSD / GOLD): 100 oz per lot
+ * Silver (XAGUSD / SILVER): 5,000 oz per lot
+ * Crypto (BTC, ETH, etc.): 1 unit per lot
+ * Indices (US30, NAS100, SPX500, etc.): 1 unit per point
+ * Oil (USOIL, UKOIL): 1,000 barrels per lot
+ */
+export const getContractSize = (pair?: string): number => {
+  if (!pair) return 100000;
+  const p = pair.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (p.includes('XAU') || p.includes('GOLD')) return 100;
+  if (p.includes('XAG') || p.includes('SILVER')) return 5000;
+  if (p.includes('BTC') || p.includes('ETH') || p.includes('SOL') || p.includes('CRYPTO')) return 1;
+  if (
+    p.includes('US30') || p.includes('NAS100') || p.includes('SPX500') ||
+    p.includes('GER30') || p.includes('DAX') || p.includes('DJ30') ||
+    p.includes('US100') || p.includes('US500') || p.includes('NDX') || p.includes('WS30')
+  ) return 1;
+  if (p.includes('OIL') || p.includes('WTI') || p.includes('BRENT')) return 1000;
+  // Default forex standard lot (100,000)
+  return 100000;
+};
+
+/**
  * Calculate PnL in account currency
- * For Forex: (exitPrice - entryPrice) * lotSize * 100000 * pipValue
- * Simplified: directional pnl per unit
+ * Uses asset-specific contract sizes instead of hardcoded 100k
  */
 export const calculatePnL = (
   tradeType: 'buy' | 'sell',
   entryPrice: number,
   exitPrice: number,
-  lotSize: number
+  lotSize: number,
+  pair?: string
 ): number => {
   const direction = tradeType === 'buy' ? 1 : -1;
   const priceDiff = (exitPrice - entryPrice) * direction;
-  const pnl = priceDiff * lotSize * 100000;
+  const contractSize = getContractSize(pair);
+  const pnl = priceDiff * lotSize * contractSize;
   return parseFloat(pnl.toFixed(2));
 };
 
@@ -218,14 +244,15 @@ export const calculateStats = (trades: ITrade[]) => {
     ? Math.round(durations.reduce((a, b) => a + b, 0) / durations.length)
     : 0;
 
-  // Phase 2: Monetary P&L calculations
-  const tradesWithPnl = trades.filter((t) => typeof t.pnlAmount === 'number');
-  const winsAmount = tradesWithPnl.filter((t) => t.result === 'win' || t.result === 'partialWin').map((t) => t.pnlAmount!);
-  const lossesAmount = tradesWithPnl.filter((t) => t.result === 'loss').map((t) => Math.abs(t.pnlAmount!));
+  // Monetary P&L calculations (supports pnlAmount or pnl)
+  const tradesWithPnl = trades.filter((t) => typeof t.pnlAmount === 'number' || typeof t.pnl === 'number');
+  const getTradePnL = (t: ITrade): number => t.pnlAmount ?? t.pnl ?? 0;
+  const winsAmount = tradesWithPnl.filter((t) => t.result === 'win' || t.result === 'partialWin').map(getTradePnL);
+  const lossesAmount = tradesWithPnl.filter((t) => t.result === 'loss').map((t) => Math.abs(getTradePnL(t)));
 
   const grossWinAmount = parseFloat(winsAmount.reduce((a, b) => a + b, 0).toFixed(2));
   const grossLossAmount = parseFloat(lossesAmount.reduce((a, b) => a + b, 0).toFixed(2));
-  const netPnL = parseFloat(tradesWithPnl.reduce((sum, t) => sum + (t.pnlAmount ?? 0), 0).toFixed(2));
+  const netPnL = parseFloat(tradesWithPnl.reduce((sum, t) => sum + getTradePnL(t), 0).toFixed(2));
 
   const avgWinAmount = winsAmount.length
     ? parseFloat((grossWinAmount / winsAmount.length).toFixed(2))

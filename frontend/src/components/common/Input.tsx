@@ -66,9 +66,10 @@ export const Input = forwardRef<TextInput, InputProps>(
             styles.inputWrapper,
             {
               borderColor,
-              borderRadius: radii.md,
+              borderRadius: radii.lg,
               backgroundColor: colors.surfaceElevated,
               borderWidth: isFocused ? 1.5 : 1,
+              ...(isFocused ? { shadowColor: colors.primary, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 3 } : {}),
             },
           ]}
         >

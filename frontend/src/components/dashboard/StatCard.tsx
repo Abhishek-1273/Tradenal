@@ -18,7 +18,7 @@ interface StatCardProps {
   compact?: boolean;
 }
 
-export const StatCard: React.FC<StatCardProps> = ({
+export const StatCard: React.FC<StatCardProps> = React.memo(({
   label,
   value,
   subValue,
@@ -31,7 +31,7 @@ export const StatCard: React.FC<StatCardProps> = ({
   style,
   compact = false,
 }) => {
-  const { colors, typography, radii, spacing } = useTheme();
+  const { colors, typography, radii, spacing, shadows } = useTheme();
 
   const accentColor = highlightColor ?? colors.primary;
 
@@ -40,31 +40,39 @@ export const StatCard: React.FC<StatCardProps> = ({
       style={[
         styles.container,
         {
-          backgroundColor: colors.surface,
           borderRadius: radii.xl,
           borderWidth: 1,
           borderColor: highlight ? accentColor + '40' : colors.border,
-          padding: compact ? spacing[3] : spacing[4],
+          padding: compact ? 10 : spacing[4],
+          backgroundColor: colors.surface,
+          ...shadows.sm,
         },
         style,
       ]}
     >
-      {highlight && (
-        <LinearGradient
-          colors={[accentColor + '18', 'transparent']}
-          style={[StyleSheet.absoluteFill, { borderRadius: radii.xl }]}
-          pointerEvents="none"
-        />
-      )}
+      <LinearGradient
+        colors={highlight ? [accentColor + '18', 'transparent'] : (colors.gradientCard as [string, string])}
+        style={[StyleSheet.absoluteFill, { borderRadius: radii.xl }]}
+        pointerEvents="none"
+      />
 
       {/* Header row */}
       <View style={styles.header}>
         <Text
           style={[
             typography.labelSm,
-            { color: colors.textTertiary, flex: 1 },
+            {
+              color: colors.textTertiary,
+              flex: 1,
+              fontWeight: '700',
+              fontSize: compact ? 9.5 : 11,
+              letterSpacing: compact ? 0.3 : 0.6,
+              marginRight: 4,
+            },
           ]}
           numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.75}
         >
           {label.toUpperCase()}
         </Text>
@@ -72,12 +80,17 @@ export const StatCard: React.FC<StatCardProps> = ({
           <View
             style={[
               styles.iconWrap,
-              { backgroundColor: (iconColor ?? colors.primary) + '20' },
+              {
+                width: compact ? 20 : 24,
+                height: compact ? 20 : 24,
+                backgroundColor: (iconColor ?? colors.primary) + '20',
+                borderRadius: radii.sm,
+              },
             ]}
           >
             <Ionicons
               name={icon as any}
-              size={14}
+              size={compact ? 11 : 13}
               color={iconColor ?? colors.primary}
             />
           </View>
@@ -91,6 +104,8 @@ export const StatCard: React.FC<StatCardProps> = ({
           {
             color: highlight ? accentColor : colors.textPrimary,
             marginTop: spacing[1.5],
+            fontWeight: '800',
+            letterSpacing: -0.3,
           },
         ]}
         numberOfLines={1}
@@ -132,6 +147,7 @@ export const StatCard: React.FC<StatCardProps> = ({
                         ? colors.error
                         : colors.textTertiary,
                     marginLeft: 3,
+                    fontWeight: '600',
                   },
                 ]}
               >
@@ -141,7 +157,7 @@ export const StatCard: React.FC<StatCardProps> = ({
           )}
           {subValue && (
             <Text
-              style={[typography.caption, { color: colors.textTertiary }]}
+              style={[typography.caption, { color: colors.textTertiary, fontWeight: '500' }]}
             >
               {subValue}
             </Text>
@@ -150,7 +166,7 @@ export const StatCard: React.FC<StatCardProps> = ({
       )}
     </View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {
@@ -164,7 +180,6 @@ const styles = StyleSheet.create({
   iconWrap: {
     width: 24,
     height: 24,
-    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -178,3 +193,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 });
+

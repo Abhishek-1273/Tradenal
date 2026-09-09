@@ -21,8 +21,8 @@ export const SelectableChip: React.FC<SelectableChipProps> = ({ label, icon, sel
       style={[
         styles.chip,
         {
-          backgroundColor: selected ? colors.primarySubtle : colors.surfaceElevated,
-          borderColor: selected ? colors.primary : colors.border,
+          backgroundColor: selected ? colors.surfaceHighlight : colors.surfaceElevated,
+          borderColor: selected ? colors.textSecondary : colors.border,
           borderRadius: radii.full,
           paddingHorizontal: spacing[3],
           paddingVertical: spacing[2],
@@ -33,16 +33,30 @@ export const SelectableChip: React.FC<SelectableChipProps> = ({ label, icon, sel
       {icon && (
         <Ionicons
           name={icon}
-          size={13}
-          color={selected ? colors.primary : colors.textTertiary}
-          style={{ marginRight: 5 }}
+          size={12}
+          color={selected ? colors.textPrimary : colors.textTertiary}
+          style={{ marginRight: 4 }}
         />
       )}
-      <Text numberOfLines={1} style={[typography.labelSm, { color: selected ? colors.primary : colors.textSecondary }]}>
+      <Text
+        numberOfLines={1}
+        adjustsFontSizeToFit={true}
+        minimumFontScale={0.78}
+        style={[
+          typography.caption,
+          {
+            color: selected ? colors.textPrimary : colors.textSecondary,
+            fontSize: 11,
+            fontWeight: selected ? '700' : '500',
+            flexShrink: 1,
+            textAlign: 'center',
+          },
+        ]}
+      >
         {label}
       </Text>
       {selected && (
-        <Ionicons name="checkmark" size={12} color={colors.primary} style={{ marginLeft: 4 }} />
+        <Ionicons name="checkmark" size={12} color={colors.textPrimary} style={{ marginLeft: 3 }} />
       )}
     </TouchableOpacity>
   );

@@ -9,6 +9,7 @@ export interface TradeFilters {
   pair?: string;
   result?: string | string[];
   session?: string;
+  strategy?: string;
   setup?: string;
   emotionBefore?: string;
   mistakes?: string[];
@@ -48,6 +49,7 @@ export class TradeRepository extends BaseRepository<ITrade> {
         : filters.result;
     }
     if (filters.session) query.session = filters.session;
+    if (filters.strategy) query.strategy = filters.strategy;
     if (filters.setup) query.setup = filters.setup;
     if (filters.emotionBefore) query.emotionBefore = filters.emotionBefore;
     if (filters.isFavorite !== undefined) query.isFavorite = filters.isFavorite;
@@ -89,7 +91,7 @@ export class TradeRepository extends BaseRepository<ITrade> {
     const sort = { [sortBy]: sortOrder === 'desc' ? -1 : 1 } as Record<string, 1 | -1>;
 
     const [trades, total] = await Promise.all([
-      Trade.find(query).sort(sort).skip(skip).limit(limit).exec(),
+      Trade.find(query).sort(sort).skip(skip).limit(limit).lean<ITrade[]>().exec(),
       Trade.countDocuments(query).exec(),
     ]);
 
@@ -98,7 +100,7 @@ export class TradeRepository extends BaseRepository<ITrade> {
 
   async findForStats(filters: TradeFilters): Promise<ITrade[]> {
     const query = this.buildFilter(filters);
-    return Trade.find(query).sort({ tradeDate: 1 }).exec();
+    return Trade.find(query).sort({ tradeDate: 1 }).lean<ITrade[]>().exec();
   }
 
   async findByDate(userId: string, date: Date, accountId?: string): Promise<ITrade[]> {
@@ -112,6 +114,7 @@ export class TradeRepository extends BaseRepository<ITrade> {
 
     return Trade.find(filter)
       .sort({ tradeDate: 1 })
+      .lean<ITrade[]>()
       .exec();
   }
 
@@ -126,6 +129,7 @@ export class TradeRepository extends BaseRepository<ITrade> {
 
     return Trade.find(filter)
       .sort({ tradeDate: 1 })
+      .lean<ITrade[]>()
       .exec();
   }
 
@@ -140,6 +144,7 @@ export class TradeRepository extends BaseRepository<ITrade> {
 
     return Trade.find(filter)
       .sort({ tradeDate: 1 })
+      .lean<ITrade[]>()
       .exec();
   }
 
@@ -167,6 +172,7 @@ export class TradeRepository extends BaseRepository<ITrade> {
           _id: { $dateToString: { format: '%Y-%m-%d', date: '$tradeDate' } },
           trades: { $sum: 1 },
           netRR: { $sum: '$rMultiple' },
+          netPnL: { $sum: '$pnlAmount' },
           wins: {
             $sum: {
               $cond: [{ $in: ['$result', ['win', 'partialWin']] }, 1, 0],
@@ -185,6 +191,7 @@ export class TradeRepository extends BaseRepository<ITrade> {
           date: '$_id',
           trades: 1,
           netRR: { $round: ['$netRR', 2] },
+          netPnL: { $round: [{ $ifNull: ['$netPnL', 0] }, 2] },
           wins: 1,
           losses: 1,
         },
@@ -269,6 +276,7 @@ export class TradeRepository extends BaseRepository<ITrade> {
     return Trade.find(filter)
       .sort({ tradeDate: -1 })
       .limit(limit)
+      .lean<ITrade[]>()
       .exec();
   }
 }

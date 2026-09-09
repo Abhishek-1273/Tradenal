@@ -27,7 +27,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isInitialized: false,
   error: null,
 
-  // ─── Initialize: restore session from storage ────────────────────────────
+  // ─── Initialize: restore session from storage (Instant Optimistic) ─────────
   initialize: async () => {
     try {
       const [accessToken, user] = await Promise.all([
@@ -36,21 +36,28 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       ]);
 
       if (accessToken && user) {
-        // Verify token is still valid by calling /me
-        try {
-          const freshUser = await authApi.getMe();
-          await storage.setUser(freshUser);
-          set({ user: freshUser, isAuthenticated: true });
-        } catch {
-          // Token invalid — clear storage
-          await storage.clearAll();
-          set({ user: null, isAuthenticated: false });
-        }
+        // Immediately restore session so app opens with zero latency!
+        set({ user, isAuthenticated: true, isInitialized: true });
+
+        // Non-blocking background verification
+        authApi.getMe()
+          .then(async (freshUser) => {
+            await storage.setUser(freshUser);
+            set({ user: freshUser });
+          })
+          .catch(async (err: any) => {
+            // Only clear storage if backend explicitly rejected with 401 Unauthorized
+            if (err?.response?.status === 401) {
+              await storage.clearAll();
+              set({ user: null, isAuthenticated: false, error: null });
+            }
+          });
+        return;
+      } else {
+        set({ user: null, isAuthenticated: false, error: null, isInitialized: true });
       }
     } catch (error) {
-      set({ user: null, isAuthenticated: false });
-    } finally {
-      set({ isInitialized: true });
+      set({ user: null, isAuthenticated: false, error: null, isInitialized: true });
     }
   },
 

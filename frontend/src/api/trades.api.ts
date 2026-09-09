@@ -88,13 +88,17 @@ export const tradesApi = {
     return res.data.data!;
   },
 
-  getTags: async (): Promise<string[]> => {
-    const res = await apiClient.get<ApiResponse<string[]>>('/trades/tags');
+  getTags: async (accountId?: string): Promise<string[]> => {
+    const res = await apiClient.get<ApiResponse<string[]>>('/trades/tags', {
+      params: accountId ? { accountId } : undefined,
+    });
     return res.data.data || [];
   },
 
-  getPairs: async (): Promise<string[]> => {
-    const res = await apiClient.get<ApiResponse<string[]>>('/trades/pairs');
+  getPairs: async (accountId?: string): Promise<string[]> => {
+    const res = await apiClient.get<ApiResponse<string[]>>('/trades/pairs', {
+      params: accountId ? { accountId } : undefined,
+    });
     return res.data.data || [];
   },
 };

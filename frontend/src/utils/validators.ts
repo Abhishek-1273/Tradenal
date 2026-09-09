@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { DEFAULT_DISCIPLINE_CHECKLIST } from '../constants';
 
 export const tradeFormSchema = z.object({
   pair: z.string().min(3, 'Pair is required').max(20),
@@ -59,13 +60,15 @@ export const tradeFormSchema = z.object({
     .refine((v) => !v || !isNaN(parseFloat(v)), 'Must be a valid number'),
 
   session: z.enum(['london', 'newyork', 'asian', 'overlap']),
-  setup: z.enum(['breakout', 'liquiditySweep', 'smc', 'ict', 'supportResistance', 'trendFollowing', 'scalp', 'swing', 'orderBlock', 'fairValueGap', 'liquiditySweepReversal', 'custom']).optional(),
+  strategy: z.string().optional(),
+  setup: z.string().optional(),
+  confluences: z.array(z.string()).default([]),
   customSetup: z.string().max(100).optional(),
   result: z.enum(['win', 'loss', 'breakeven', 'partialWin']),
 
-  emotionBefore: z.enum(['confident', 'fear', 'greedy', 'fomo', 'calm', 'excited', 'bored', 'tired', 'distracted']).optional(),
-  emotionDuring: z.enum(['calm', 'anxious', 'doubtful', 'tempted_to_close', 'tempted_to_move_sl', 'confident_held', 'tempted_to_add', 'impatient', 'panicky']).optional(),
-  emotionAfter: z.enum(['happy', 'frustrated', 'angry', 'satisfied', 'neutral', 'regretful', 'proud', 'relieved', 'disappointed']).optional(),
+  emotionBefore: z.string().optional(),
+  emotionDuring: z.string().optional(),
+  emotionAfter: z.string().optional(),
   confluenceCount: z.number().int().min(0).max(20).default(0),
   followedPlan: z.boolean().default(true),
   overtraded: z.boolean().default(false),
@@ -78,11 +81,15 @@ export const tradeFormSchema = z.object({
   sizedCorrectly: z.boolean().default(true),
   withinDailyLossLimit: z.boolean().default(true),
   singleTradeDominance: z.boolean().default(true),
+  checklist: z.array(z.string()).default([]),
   mistakes: z.array(z.string()).default([]),
   customMistake: z.string().max(200).optional(),
 
   reasonForEntry: z.string().max(1000).optional(),
   notes: z.string().max(5000).optional(),
+  keyTakeaway: z.string().max(2000).optional(),
+  whatWentWell: z.string().max(2000).optional(),
+  whatToImprove: z.string().max(2000).optional(),
   tags: z.array(z.string()).default([]),
   isFavorite: z.boolean().default(false),
 });
@@ -103,7 +110,9 @@ export const tradeFormDefaults: TradeFormData = {
   riskPercent: '1',
   pnlAmount: '',
   session: 'london',
+  strategy: undefined,
   setup: undefined,
+  confluences: [],
   customSetup: '',
   result: 'win',
   emotionBefore: undefined,
@@ -121,10 +130,14 @@ export const tradeFormDefaults: TradeFormData = {
   sizedCorrectly: true,
   withinDailyLossLimit: true,
   singleTradeDominance: true,
+  checklist: DEFAULT_DISCIPLINE_CHECKLIST,
   mistakes: [],
   customMistake: '',
   reasonForEntry: '',
   notes: '',
+  keyTakeaway: '',
+  whatWentWell: '',
+  whatToImprove: '',
   tags: [],
   isFavorite: false,
 };

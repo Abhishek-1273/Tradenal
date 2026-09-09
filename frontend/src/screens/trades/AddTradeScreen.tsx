@@ -22,9 +22,16 @@ import { TimeField } from '../../components/common/TimeField';
 import { ImageViewerModal } from '../../components/common/ImageViewerModal';
 import { StepNavigationBar } from '../../components/common/StepNavigationBar';
 import { EmotionCard } from '../../components/trade/EmotionCard';
-import { DisciplineRow } from '../../components/trade/DisciplineRow';
+import { DisciplineChecklist } from '../../components/trade/DisciplineChecklist';
+import { StructuredMistakesSelector } from '../../components/trade/StructuredMistakesSelector';
 import { RRCalculator } from '../../components/trade/RRCalculator';
+import { CascadingSetupSelector } from '../../components/trade/CascadingSetupSelector';
+import { ExecutionGradeCard } from '../../components/trade/ExecutionGradeCard';
+import { FinalActionBar } from '../../components/trade/FinalActionBar';
 import { tradeFormSchema, TradeFormData, tradeFormDefaults } from '../../utils/validators';
+import { calculateRiskCapAudit } from '../../utils/riskCap';
+import { calculateExecutionGrade } from '../../utils/executionGrade';
+import { serializeTradeNotes } from '../../utils/tradeNotes';
 import { useToast } from '../../components/common/Toast';
 import { useAuthStore } from '../../store/auth.store';
 import { combineDateAndTime } from '../../utils/formatters';
@@ -40,7 +47,7 @@ type Section = typeof SECTIONS[number];
 type LocalImage = { uri: string; name: string; mimeType: string; screenshotType: 'before' | 'after' | 'markup' };
 
 export const AddTradeScreen: React.FC = () => {
-  const { colors, typography, spacing, radii } = useTheme();
+  const { colors, typography, spacing, radii, isDark } = useTheme();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { showToast } = useToast();
@@ -53,15 +60,52 @@ export const AddTradeScreen: React.FC = () => {
   const [uploadingImages, setUploadingImages] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const { activeAccount } = useAccountStore();
+  const scrollViewRef = useRef<ScrollView>(null);
+  const setupSectionY = useRef<number>(0);
+  const [strategyError, setStrategyError] = useState<string | null>(null);
 
-  const { control, handleSubmit, watch, setValue, formState: { errors } } = useForm<TradeFormData>({
+  const { control, handleSubmit, watch, setValue, trigger, formState: { errors } } = useForm<TradeFormData>({
     resolver: zodResolver(tradeFormSchema),
     defaultValues: tradeFormDefaults,
   });
 
-  const [ep, sl, tp, ex, tt, ls, rp, pairValue, reasonValue, notesValue, entryTimeValue] = watch([
-    'entryPrice', 'stopLoss', 'takeProfit', 'exitPrice', 'tradeType', 'lotSize', 'riskPercent', 'pair', 'reasonForEntry', 'notes', 'entryTime',
+  const [
+    ep, sl, tp, ex, tt, ls, rp, pairValue, reasonValue, notesValue, entryTimeValue, pnlValStr, checklistVal, mistakesVal,
+  ] = watch([
+    'entryPrice', 'stopLoss', 'takeProfit', 'exitPrice', 'tradeType', 'lotSize', 'riskPercent',
+    'pair', 'reasonForEntry', 'notes', 'entryTime', 'pnlAmount', 'checklist', 'mistakes',
   ]);
+
+  const riskAudit = calculateRiskCapAudit(activeAccount, rp, pnlValStr);
+  const gradeResult = calculateExecutionGrade(checklistVal, mistakesVal, isDark);
+
+  // ── Clipboard Paste (Ctrl + V on Desktop / Web) ───────────────────────────
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+    const handlePaste = (e: any) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.type && item.type.indexOf('image') !== -1) {
+          const blob = item.getAsFile();
+          if (blob) {
+            const uri = URL.createObjectURL(blob);
+            const newImg: LocalImage = {
+              uri,
+              name: blob.name || `clipboard_${Date.now()}.png`,
+              mimeType: blob.type || 'image/png',
+              screenshotType: 'before',
+            };
+            setLocalImages((prev) => [...prev, newImg].slice(0, 10));
+            showToast('Screenshot pasted from clipboard', 'success');
+          }
+        }
+      }
+    };
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, []);
 
   // ── Animated tab indicator ──────────────────────────────────────────────
   const [tabBarWidth, setTabBarWidth] = useState(0);
@@ -86,6 +130,56 @@ export const AddTradeScreen: React.FC = () => {
   const goTo = (s: Section) => {
     setVisited((prev) => new Set(prev).add(activeSection));
     setActiveSection(s);
+  };
+
+  const handleNextStep = async () => {
+    if (activeSection === 'Trade Info') {
+      const isPairValid = await trigger('pair');
+      const isDateValid = await trigger('tradeDate');
+      const isResultValid = await trigger('result');
+      const currentStrat = watch('strategy');
+
+      if (!currentStrat) {
+        setStrategyError('Primary Strategy is required to proceed');
+        showToast('Please select a Primary Strategy', 'error');
+        return;
+      } else {
+        setStrategyError(null);
+      }
+
+      if (!isPairValid || !isDateValid || !isResultValid) {
+        showToast('Please fill out all required Trade Info fields', 'error');
+        return;
+      }
+
+      goTo('Prices');
+    } else if (activeSection === 'Prices') {
+      const isEpValid = await trigger('entryPrice');
+      const isSlValid = await trigger('stopLoss');
+      const isLsValid = await trigger('lotSize');
+      const isRpValid = await trigger('riskPercent');
+      const isPnlValid = await trigger('pnlAmount');
+
+      const epVal = parseFloat(ep);
+      const slVal = parseFloat(sl || '');
+
+      if (!isEpValid || isNaN(epVal) || epVal <= 0) {
+        showToast('Valid Entry Price is required to proceed', 'error');
+        return;
+      }
+      if (!isSlValid || isNaN(slVal) || slVal <= 0) {
+        showToast('Valid Stop Loss is required to proceed', 'error');
+        return;
+      }
+      if (!isLsValid || !isRpValid || !isPnlValid) {
+        showToast('Please correct numeric fields in Execution Details', 'error');
+        return;
+      }
+
+      goTo('Psychology');
+    } else if (activeSection === 'Psychology') {
+      goTo('Notes');
+    }
   };
 
   // ── Session auto-calculation ─────────────────────────────────────────────
@@ -116,20 +210,76 @@ export const AddTradeScreen: React.FC = () => {
     else if (newYork) session = 'newyork';
     else if (asian) session = 'asian';
     setValue('session', session);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entryTimeValue]);
+
+  const FIELD_TO_SECTION_MAP: Record<string, Section> = {
+    pair: 'Trade Info',
+    tradeType: 'Trade Info',
+    tradeDate: 'Trade Info',
+    entryTime: 'Trade Info',
+    exitTime: 'Trade Info',
+    session: 'Trade Info',
+    strategy: 'Trade Info',
+    setup: 'Trade Info',
+    confluences: 'Trade Info',
+    customSetup: 'Trade Info',
+    result: 'Trade Info',
+
+    entryPrice: 'Prices',
+    stopLoss: 'Prices',
+    takeProfit: 'Prices',
+    exitPrice: 'Prices',
+    lotSize: 'Prices',
+    riskPercent: 'Prices',
+    pnlAmount: 'Prices',
+
+    emotionBefore: 'Psychology',
+    emotionDuring: 'Psychology',
+    emotionAfter: 'Psychology',
+    checklist: 'Psychology',
+    mistakes: 'Psychology',
+    customMistake: 'Psychology',
+
+    keyTakeaway: 'Notes',
+    whatWentWell: 'Notes',
+    whatToImprove: 'Notes',
+    notes: 'Notes',
+    reasonForEntry: 'Notes',
+    tags: 'Notes',
+  };
 
   const onInvalid = (formErrors: any) => {
     const errorKeys = Object.keys(formErrors);
     if (errorKeys.length > 0) {
       const firstField = errorKeys[0];
-      const message = formErrors[firstField]?.message;
-      showToast(`${firstField.toUpperCase()}: ${message}`, 'error');
+      const message = formErrors[firstField]?.message || 'Required field is invalid';
+      const targetSection = FIELD_TO_SECTION_MAP[firstField] || 'Trade Info';
+      if (activeSection !== targetSection) {
+        goTo(targetSection);
+      }
+      showToast(`${firstField.toUpperCase()}: ${message} (in ${targetSection})`, 'error');
     }
   };
 
   const onSubmit = async (data: TradeFormData) => {
     try {
+      let pnlVal = data.pnlAmount ? parseFloat(data.pnlAmount) : undefined;
+      if (pnlVal !== undefined && !isNaN(pnlVal)) {
+        if (data.result === 'loss' && pnlVal > 0) pnlVal = -pnlVal;
+        if ((data.result === 'win' || data.result === 'partialWin') && pnlVal < 0) pnlVal = Math.abs(pnlVal);
+        if (data.result === 'breakeven') pnlVal = 0;
+      }
+
+      const compiledNotes = serializeTradeNotes(
+        {
+          keyTakeaway: data.keyTakeaway,
+          whatWentWell: data.whatWentWell,
+          whatToImprove: data.whatToImprove,
+        },
+        data.notes
+      );
+
       const trade = await createTrade({
         pair: data.pair, tradeType: data.tradeType, tradeDate: data.tradeDate,
         entryTime: combineDateAndTime(data.tradeDate, data.entryTime),
@@ -139,20 +289,34 @@ export const AddTradeScreen: React.FC = () => {
         takeProfit: data.takeProfit ? parseFloat(data.takeProfit) : undefined,
         exitPrice: data.exitPrice ? parseFloat(data.exitPrice) : undefined,
         lotSize: parseFloat(data.lotSize), riskPercent: parseFloat(data.riskPercent),
-        pnlAmount: data.pnlAmount ? parseFloat(data.pnlAmount) : undefined,
-        session: data.session, setup: data.setup, customSetup: data.customSetup,
+        pnlAmount: pnlVal,
+        session: data.session,
+        strategy: data.strategy,
+        setup: data.setup === 'custom' && data.customSetup ? data.customSetup.trim() : data.setup,
+        confluences: data.confluences,
+        customSetup: data.customSetup,
         result: data.result, emotionBefore: data.emotionBefore,
         emotionDuring: data.emotionDuring, emotionAfter: data.emotionAfter,
-        confluenceCount: data.confluenceCount,
-        followedPlan: data.followedPlan, overtraded: data.overtraded, movedSL: data.movedSL,
-        movedTP: data.movedTP, revengeTrade: data.revengeTrade, newsTrade: data.newsTrade,
-        checkedHigherTimeframe: data.checkedHigherTimeframe,
-        waitedForConfirmation: data.waitedForConfirmation,
-        sizedCorrectly: data.sizedCorrectly,
-        withinDailyLossLimit: data.withinDailyLossLimit,
-        singleTradeDominance: data.singleTradeDominance,
+        confluenceCount: (data.confluences && data.confluences.length > 0) ? data.confluences.length : data.confluenceCount,
+        checklist: data.checklist || [],
+        followedPlan: data.checklist ? data.checklist.includes('plan_followed') : data.followedPlan,
+        overtraded: data.checklist ? !data.checklist.includes('one_and_done') : data.overtraded,
+        movedSL: data.checklist ? !data.checklist.includes('zero_sl_widening') : data.movedSL,
+        movedTP: data.movedTP,
+        revengeTrade: data.checklist ? !data.checklist.includes('not_revenge_trade') : data.revengeTrade,
+        newsTrade: data.checklist ? !data.checklist.includes('news_window_clear') : data.newsTrade,
+        checkedHigherTimeframe: data.checklist ? data.checklist.includes('pre_market_routine') : data.checkedHigherTimeframe,
+        waitedForConfirmation: data.checklist ? data.checklist.includes('candle_close_confirmation') : data.waitedForConfirmation,
+        sizedCorrectly: data.checklist ? data.checklist.includes('risk_cap') : data.sizedCorrectly,
+        withinDailyLossLimit: data.checklist ? data.checklist.includes('risk_cap') : data.withinDailyLossLimit,
+        singleTradeDominance: data.checklist ? data.checklist.includes('one_and_done') : data.singleTradeDominance,
         mistakes: data.mistakes as any[], customMistake: data.customMistake,
-        reasonForEntry: data.reasonForEntry, notes: data.notes, tags: data.tags, isFavorite: data.isFavorite,
+        reasonForEntry: data.reasonForEntry,
+        notes: compiledNotes || data.notes,
+        keyTakeaway: data.keyTakeaway,
+        whatWentWell: data.whatWentWell,
+        whatToImprove: data.whatToImprove,
+        tags: data.tags, isFavorite: data.isFavorite,
       });
 
       // Upload any local images after the trade is created
@@ -258,8 +422,8 @@ export const AddTradeScreen: React.FC = () => {
                 </Text>
               )}
             </View>
-            <TouchableOpacity onPress={handleSubmit(onSubmit, onInvalid)} disabled={isPending} style={[styles.saveBtn, { backgroundColor: colors.primary }]}>
-              <Text numberOfLines={1} style={[typography.label, { color: '#fff' }]}>{isPending ? 'Saving...' : 'Save'}</Text>
+            <TouchableOpacity onPress={handleSubmit(onSubmit, onInvalid)} disabled={isPending} style={[styles.saveBtn, { backgroundColor: colors.textPrimary }]}>
+              <Text numberOfLines={1} style={[typography.label, { color: colors.background }]}>{isPending ? 'Saving...' : 'Save'}</Text>
             </TouchableOpacity>
           </View>
 
@@ -270,7 +434,7 @@ export const AddTradeScreen: React.FC = () => {
                   styles.tabIndicator,
                   {
                     width: tabWidth,
-                    backgroundColor: colors.primary,
+                    backgroundColor: colors.textPrimary,
                     transform: [{ translateX: indicatorTranslate }],
                   },
                 ]}
@@ -282,7 +446,7 @@ export const AddTradeScreen: React.FC = () => {
               return (
                 <TouchableOpacity key={s} onPress={() => goTo(s)} style={styles.sectionTab} activeOpacity={0.7}>
                   {isDone && <Ionicons name="checkmark-circle" size={12} color={colors.success} style={{ marginRight: 3 }} />}
-                  <Text numberOfLines={1} style={[typography.labelSm, { color: isActive ? colors.primary : colors.textTertiary, fontWeight: isActive ? '700' : '500' }]}>
+                  <Text numberOfLines={1} style={[typography.labelSm, { color: isActive ? colors.textPrimary : colors.textTertiary, fontWeight: isActive ? '700' : '500' }]}>
                     {s}
                   </Text>
                 </TouchableOpacity>
@@ -291,7 +455,7 @@ export const AddTradeScreen: React.FC = () => {
           </View>
         </View>
 
-        <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={[{ paddingHorizontal: spacing[5], paddingBottom: spacing[6], paddingTop: spacing[4] }]}>
+        <ScrollView ref={scrollViewRef} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={[{ paddingHorizontal: spacing[5], paddingBottom: spacing[6], paddingTop: spacing[4] }]}>
 
           {activeSection === 'Trade Info' && (
             <View>
@@ -308,13 +472,13 @@ export const AddTradeScreen: React.FC = () => {
                       style={[
                         styles.quickPairChip,
                         {
-                          backgroundColor: selected ? colors.primary : colors.surfaceElevated,
-                          borderColor: selected ? colors.primary : colors.border,
+                          backgroundColor: selected ? colors.textPrimary : colors.surfaceElevated,
+                          borderColor: selected ? colors.textPrimary : colors.border,
                           borderRadius: radii.md,
                         },
                       ]}
                     >
-                      <Text style={[typography.labelSm, { color: selected ? '#fff' : colors.textSecondary }]}>{pair}</Text>
+                      <Text style={[typography.labelSm, { color: selected ? colors.background : colors.textSecondary }]}>{pair}</Text>
                     </TouchableOpacity>
                   );
                 })}
@@ -414,7 +578,13 @@ export const AddTradeScreen: React.FC = () => {
                         label={s.label}
                         icon={s.icon as any}
                         selected={value === s.value}
-                        onPress={() => onChange(s.value)}
+                        color={s.color}
+                        onPress={() => {
+                          onChange(s.value);
+                          setTimeout(() => {
+                            scrollViewRef.current?.scrollTo({ y: setupSectionY.current, animated: true });
+                          }, 200);
+                        }}
                         style={{ width: '48.5%', marginBottom: spacing[2] }}
                       />
                     ))}
@@ -422,24 +592,46 @@ export const AddTradeScreen: React.FC = () => {
                 </View>
               )} />
 
-              <Controller control={control} name="setup" render={({ field: { onChange, value } }) => (
-                <View style={{ marginBottom: spacing[4] }}>
-                  <Text style={[typography.label, { color: colors.textSecondary, marginBottom: spacing[2] }]}>Setup</Text>
-                  <View style={styles.grid3}>
-                    {SETUPS.map((s) => (
-                      <SelectableCard
-                        key={s.value}
-                        label={s.label}
-                        icon={s.icon as any}
-                        selected={value === s.value}
-                        onPress={() => onChange(s.value)}
-                        size="sm"
-                        style={{ width: '32%', marginBottom: spacing[2] }}
-                      />
-                    ))}
-                  </View>
-                </View>
-              )} />
+              <View onLayout={(e) => { setupSectionY.current = e.nativeEvent.layout.y; }}>
+                <Controller
+                  control={control}
+                  name="setup"
+                  render={({ field: { onChange: onSetupChange, value: setupVal } }) => (
+                    <Controller
+                      control={control}
+                      name="strategy"
+                      render={({ field: { onChange: onStrategyChange, value: stratVal } }) => (
+                        <Controller
+                          control={control}
+                          name="confluences"
+                          render={({ field: { onChange: onConfluencesChange, value: confVal } }) => (
+                            <Controller
+                              control={control}
+                              name="customSetup"
+                              render={({ field: { onChange: onCustomSetupChange, value: customVal } }) => (
+                                <CascadingSetupSelector
+                                  selectedStrategy={stratVal}
+                                  selectedSetup={setupVal}
+                                  selectedConfluences={confVal || []}
+                                  customSetupText={customVal || ''}
+                                  error={strategyError || undefined}
+                                  onStrategyChange={(strat) => {
+                                    setStrategyError(null);
+                                    onStrategyChange(strat);
+                                  }}
+                                  onSetupChange={onSetupChange}
+                                  onConfluencesChange={onConfluencesChange}
+                                  onCustomSetupChange={onCustomSetupChange}
+                                />
+                              )}
+                            />
+                          )}
+                        />
+                      )}
+                    />
+                  )}
+                />
+              </View>
 
               <Controller control={control} name="result" render={({ field: { onChange, value } }) => (
                 <View style={{ marginBottom: spacing[2] }}>
@@ -492,17 +684,105 @@ export const AddTradeScreen: React.FC = () => {
                 )} />
               </View>
 
-              <Controller control={control} name="pnlAmount" render={({ field: { onChange, value } }) => (
-                <Input
-                  label={`PnL Amount (${useAccountStore.getState().activeAccount?.currency || 'USD'})`}
-                  placeholder="e.g. 150.00 or -50.00 (Optional)"
-                  value={value}
-                  onChangeText={onChange}
-                  error={errors.pnlAmount?.message}
-                  keyboardType="numeric"
-                  leftIcon={<Ionicons name="cash-outline" size={16} color={colors.textTertiary} />}
+              {/* Dynamic ≤ 1% Account Risk Cap Helper (Tab 2) */}
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  backgroundColor: riskAudit.isViolated
+                    ? 'rgba(239, 68, 68, 0.10)'
+                    : isDark ? 'rgba(16, 185, 129, 0.08)' : '#F0FDF4',
+                  borderColor: riskAudit.isViolated ? 'rgba(239, 68, 68, 0.35)' : 'rgba(16, 185, 129, 0.25)',
+                  borderWidth: 1,
+                  borderRadius: radii.sm,
+                  paddingVertical: 7,
+                  paddingHorizontal: 10,
+                  marginBottom: spacing[3],
+                }}
+              >
+                <Ionicons
+                  name={riskAudit.isViolated ? 'alert-circle' : 'shield-checkmark'}
+                  size={15}
+                  color={riskAudit.isViolated ? '#EF4444' : '#10B981'}
                 />
-              )} />
+                <Text
+                  style={{
+                    fontSize: 11.5,
+                    fontWeight: '600',
+                    color: riskAudit.isViolated ? '#EF4444' : (isDark ? '#A7F3D0' : '#047857'),
+                    flex: 1,
+                  }}
+                >
+                  {riskAudit.isViolated
+                    ? `⚠️ VIOLATION: ${riskAudit.violationReason}`
+                    : `≤ 1% Account Risk Cap: Max ${riskAudit.currencySymbol}${riskAudit.maxOnePercentRisk.toFixed(0)} on ${riskAudit.currencySymbol}${riskAudit.accountBalance.toLocaleString()} starting balance.`}
+                </Text>
+              </View>
+
+              <Controller control={control} name="pnlAmount" render={({ field: { onChange, value } }) => {
+                const currentStr = value || '';
+                const isNegative = currentStr.startsWith('-');
+                const handleToggleSign = (makeNegative: boolean) => {
+                  const clean = currentStr.replace(/^-/, '');
+                  if (!clean) {
+                    onChange(makeNegative ? '-' : '');
+                  } else {
+                    onChange(makeNegative ? `-${clean}` : clean);
+                  }
+                };
+                return (
+                  <View style={{ marginBottom: spacing[3] }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing[1.5] }}>
+                      <Text style={[typography.label, { color: colors.textSecondary }]}>
+                        {`PnL Amount (${useAccountStore.getState().activeAccount?.currency || 'USD'})`}
+                      </Text>
+                      <View style={{ flexDirection: 'row', gap: 6 }}>
+                        <TouchableOpacity
+                          onPress={() => handleToggleSign(false)}
+                          activeOpacity={0.8}
+                          style={{
+                            paddingHorizontal: 10,
+                            paddingVertical: 3,
+                            borderRadius: 6,
+                            backgroundColor: !isNegative && currentStr ? colors.successSubtle : colors.surfaceElevated,
+                            borderColor: !isNegative && currentStr ? colors.success : colors.border,
+                            borderWidth: 1,
+                          }}
+                        >
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: !isNegative && currentStr ? colors.success : colors.textTertiary }}>
+                            + Profit
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => handleToggleSign(true)}
+                          activeOpacity={0.8}
+                          style={{
+                            paddingHorizontal: 10,
+                            paddingVertical: 3,
+                            borderRadius: 6,
+                            backgroundColor: isNegative ? colors.errorSubtle : colors.surfaceElevated,
+                            borderColor: isNegative ? colors.error : colors.border,
+                            borderWidth: 1,
+                          }}
+                        >
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: isNegative ? colors.error : colors.textTertiary }}>
+                            - Loss
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                    <Input
+                      placeholder={isNegative ? (riskAudit.maxOnePercentRisk > 0 ? `-${riskAudit.maxOnePercentRisk.toFixed(2)}` : "-0.00") : "150.00 (Optional)"}
+                      value={value}
+                      onChangeText={onChange}
+                      error={errors.pnlAmount?.message}
+                      keyboardType="decimal-pad"
+                      leftIcon={<Ionicons name="cash-outline" size={16} color={isNegative ? colors.error : colors.textTertiary} />}
+                    />
+                  </View>
+                );
+              }} />
 
               <Controller control={control} name="reasonForEntry" render={({ field: { onChange, value } }) => (
                 <View style={{ marginBottom: spacing[2] }}>
@@ -530,95 +810,184 @@ export const AddTradeScreen: React.FC = () => {
             <View>
               <Text style={[typography.h3, { color: colors.textPrimary, marginBottom: spacing[4] }]}>Psychology</Text>
 
-              <Controller control={control} name="emotionBefore" render={({ field: { onChange, value } }) => (
-                <View style={{ marginBottom: spacing[4] }}>
-                  <Text style={[typography.label, { color: colors.textSecondary, marginBottom: spacing[2] }]}>Emotion Before Trade</Text>
-                  <View style={styles.grid3}>
-                    {EMOTIONS_BEFORE.map((e) => (
-                      <EmotionCard
-                        key={e.value}
-                        label={e.label}
-                        icon={e.icon as any}
-                        selected={value === e.value}
-                        onPress={() => onChange(e.value)}
-                        style={{ width: '32%', marginBottom: spacing[2] }}
-                      />
-                    ))}
-                  </View>
-                </View>
-              )} />
-
-              <Controller control={control} name="emotionDuring" render={({ field: { onChange, value } }) => (
-                <View style={{ marginBottom: spacing[4] }}>
-                  <Text style={[typography.label, { color: colors.textSecondary, marginBottom: spacing[2] }]}>Emotion During Trade</Text>
-                  <View style={styles.grid3}>
-                    {EMOTIONS_DURING.map((e) => (
-                      <EmotionCard
-                        key={e.value}
-                        label={e.label}
-                        icon={e.icon as any}
-                        selected={value === e.value}
-                        onPress={() => onChange(e.value === value ? undefined : e.value)}
-                        style={{ width: '32%', marginBottom: spacing[2] }}
-                      />
-                    ))}
-                  </View>
-                </View>
-              )} />
-
-              <Controller control={control} name="emotionAfter" render={({ field: { onChange, value } }) => (
-                <View style={{ marginBottom: spacing[3] }}>
-                  <Text style={[typography.label, { color: colors.textSecondary, marginBottom: spacing[2] }]}>Emotion After Trade</Text>
-                  <View style={styles.grid3}>
-                    {EMOTIONS_AFTER.map((e) => (
-                      <EmotionCard
-                        key={e.value}
-                        label={e.label}
-                        icon={e.icon as any}
-                        selected={value === e.value}
-                        onPress={() => onChange(e.value)}
-                        style={{ width: '32%', marginBottom: spacing[2] }}
-                      />
-                    ))}
-                  </View>
-                </View>
-              )} />
-
-
-
-              <Text style={[typography.label, { color: colors.textSecondary, marginBottom: spacing[3] }]}>Discipline Checklist</Text>
-              {DISCIPLINE_ITEMS.map((item) => (
-                <Controller key={item.name} control={control} name={item.name as any} render={({ field: { onChange, value } }) => (
-                  <DisciplineRow label={item.label} subtitle={item.sub} icon={item.icon as any} value={value as boolean} onChange={onChange} warnWhenOn={item.warn} />
-                )} />
-              ))}
-
-              <Controller control={control} name="mistakes" render={({ field: { onChange, value } }) => (
-                <View style={{ marginTop: spacing[4], marginBottom: spacing[2] }}>
-                  <Text style={[typography.label, { color: colors.textSecondary, marginBottom: spacing[2] }]}>Mistakes</Text>
-                  <View style={styles.chipWrap}>
-                    {MISTAKES.map((m) => {
-                      const selected = (value ?? []).includes(m.value);
-                      return (
-                        <SelectableChip
-                          key={m.value}
-                          label={m.label}
-                          icon={m.icon as any}
-                          selected={selected}
-                          onPress={() => onChange(selected ? value.filter((v: string) => v !== m.value) : [...value, m.value])}
-                          style={{ marginRight: spacing[2], marginBottom: spacing[2] }}
+              <Controller control={control} name="emotionBefore" render={({ field: { onChange, value } }) => {
+                const activeObj = EMOTIONS_BEFORE.find((e) => e.value === value);
+                return (
+                  <View style={{ marginBottom: spacing[4] }}>
+                    <Text style={[typography.label, { color: colors.textSecondary, marginBottom: spacing[2] }]}>
+                      Emotion Before Trade (Pre-Entry)
+                    </Text>
+                    <View style={styles.grid3}>
+                      {EMOTIONS_BEFORE.map((e) => (
+                        <EmotionCard
+                          key={e.value}
+                          label={e.label}
+                          icon={e.icon as any}
+                          selected={value === e.value}
+                          onPress={() => onChange(value === e.value ? undefined : e.value)}
+                          style={{ width: '32%', marginBottom: spacing[2] }}
                         />
-                      );
-                    })}
+                      ))}
+                    </View>
+                    {activeObj?.desc && (
+                      <View style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6,
+                        backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#F1F5F9',
+                        paddingHorizontal: 10,
+                        paddingVertical: 6,
+                        borderRadius: radii.sm,
+                        borderLeftWidth: 3,
+                        borderLeftColor: colors.primary,
+                        marginTop: 2,
+                      }}>
+                        <Ionicons name="information-circle-outline" size={14} color={colors.primary} />
+                        <Text style={{ fontSize: 11.5, color: colors.textSecondary, flex: 1 }}>
+                          {activeObj.desc}
+                        </Text>
+                      </View>
+                    )}
                   </View>
-                </View>
-              )} />
+                );
+              }} />
+
+              <Controller control={control} name="emotionDuring" render={({ field: { onChange, value } }) => {
+                const activeObj = EMOTIONS_DURING.find((e) => e.value === value);
+                return (
+                  <View style={{ marginBottom: spacing[4] }}>
+                    <Text style={[typography.label, { color: colors.textSecondary, marginBottom: spacing[2] }]}>
+                      Emotion During Trade (In-Trade)
+                    </Text>
+                    <View style={styles.grid3}>
+                      {EMOTIONS_DURING.map((e) => (
+                        <EmotionCard
+                          key={e.value}
+                          label={e.label}
+                          icon={e.icon as any}
+                          selected={value === e.value}
+                          onPress={() => onChange(value === e.value ? undefined : e.value)}
+                          style={{ width: '32%', marginBottom: spacing[2] }}
+                        />
+                      ))}
+                    </View>
+                    {activeObj?.desc && (
+                      <View style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6,
+                        backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#F1F5F9',
+                        paddingHorizontal: 10,
+                        paddingVertical: 6,
+                        borderRadius: radii.sm,
+                        borderLeftWidth: 3,
+                        borderLeftColor: colors.primary,
+                        marginTop: 2,
+                      }}>
+                        <Ionicons name="information-circle-outline" size={14} color={colors.primary} />
+                        <Text style={{ fontSize: 11.5, color: colors.textSecondary, flex: 1 }}>
+                          {activeObj.desc}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                );
+              }} />
+
+              <Controller control={control} name="emotionAfter" render={({ field: { onChange, value } }) => {
+                const activeObj = EMOTIONS_AFTER.find((e) => e.value === value);
+                return (
+                  <View style={{ marginBottom: spacing[3] }}>
+                    <Text style={[typography.label, { color: colors.textSecondary, marginBottom: spacing[2] }]}>
+                      Emotion After Trade (Post-Exit)
+                    </Text>
+                    <View style={styles.grid3}>
+                      {EMOTIONS_AFTER.map((e) => (
+                        <EmotionCard
+                          key={e.value}
+                          label={e.label}
+                          icon={e.icon as any}
+                          selected={value === e.value}
+                          onPress={() => onChange(value === e.value ? undefined : e.value)}
+                          style={{ width: '32%', marginBottom: spacing[2] }}
+                        />
+                      ))}
+                    </View>
+                    {activeObj?.desc && (
+                      <View style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6,
+                        backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : '#F1F5F9',
+                        paddingHorizontal: 10,
+                        paddingVertical: 6,
+                        borderRadius: radii.sm,
+                        borderLeftWidth: 3,
+                        borderLeftColor: colors.primary,
+                        marginTop: 2,
+                      }}>
+                        <Ionicons name="information-circle-outline" size={14} color={colors.primary} />
+                        <Text style={{ fontSize: 11.5, color: colors.textSecondary, flex: 1 }}>
+                          {activeObj.desc}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                );
+              }} />
+
+
+
+              <View style={{ marginBottom: spacing[4] }}>
+                <Text style={[typography.label, { color: colors.textSecondary, marginBottom: spacing[2] }]}>
+                  Discipline Checklist
+                </Text>
+                <Controller
+                  control={control}
+                  name="checklist"
+                  render={({ field: { onChange, value } }) => (
+                    <DisciplineChecklist value={value || []} onChange={onChange} />
+                  )}
+                />
+              </View>
+
+              <Controller
+                control={control}
+                name="mistakes"
+                render={({ field: { onChange: onMistakesChange, value: mistakesValue } }) => (
+                  <Controller
+                    control={control}
+                    name="customMistake"
+                    render={({ field: { onChange: onCustomChange, value: customVal } }) => (
+                      <View style={{ marginTop: spacing[4], marginBottom: spacing[2] }}>
+                        <Text style={[typography.label, { color: colors.textSecondary, marginBottom: spacing[2.5] }]}>
+                          Mistakes & Execution Errors
+                        </Text>
+                        <StructuredMistakesSelector
+                          value={mistakesValue || []}
+                          onChange={onMistakesChange}
+                          customMistake={customVal || ''}
+                          onCustomMistakeChange={onCustomChange}
+                        />
+                      </View>
+                    )}
+                  />
+                )}
+              />
             </View>
           )}
 
           {activeSection === 'Notes' && (
             <View>
-              <Text style={[typography.h3, { color: colors.textPrimary, marginBottom: spacing[4] }]}>Notes & Tags</Text>
+              <Text style={[typography.h3, { color: colors.textPrimary, marginBottom: spacing[3] }]}>Notes & Tags</Text>
+
+              {/* ── Deterministic Locked Execution Grade Card (Tab 4) ── */}
+              <ExecutionGradeCard
+                checklist={checklistVal}
+                mistakes={mistakesVal}
+                onNavigateToTab={() => goTo('Psychology')}
+                style={{ marginBottom: spacing[4] }}
+              />
 
               {/* ── Screenshots picker ── */}
               <View style={{ marginBottom: spacing[4] }}>
@@ -653,8 +1022,8 @@ export const AddTradeScreen: React.FC = () => {
                     onPress={pickImages}
                     style={[{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surfaceElevated, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, paddingVertical: spacing[3], gap: spacing[2] }]}
                   >
-                    <Ionicons name="image-outline" size={18} color={colors.primary} />
-                    <Text style={[typography.labelSm, { color: colors.primary }]}>Gallery</Text>
+                    <Ionicons name="image-outline" size={18} color={colors.textSecondary} />
+                    <Text style={[typography.labelSm, { color: colors.textSecondary }]}>Gallery</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={captureImage}
@@ -668,34 +1037,48 @@ export const AddTradeScreen: React.FC = () => {
                   Max 10 images.
                 </Text>
               </View>
-              <Controller control={control} name="notes" render={({ field: { onChange, value } }) => (
-                <View style={{ marginBottom: spacing[4] }}>
-                  <View style={[styles.labelWithIcon, { marginBottom: spacing[2] }]}>
-                    <Ionicons name="document-text-outline" size={14} color={colors.textTertiary} style={{ marginRight: 5 }} />
-                    <Text style={[typography.label, { color: colors.textSecondary }]}>Trade Notes</Text>
+              {/* ── Simple Trade Notes & Reflection ── */}
+              <Controller
+                control={control}
+                name="notes"
+                render={({ field: { onChange, value } }) => (
+                  <View style={{ marginBottom: spacing[4] }}>
+                    <Text style={[typography.label, { color: colors.textSecondary, marginBottom: spacing[2] }]}>
+                      Trade Notes & Reflection
+                    </Text>
+                    <TextInput
+                      style={[
+                        typography.body,
+                        {
+                          backgroundColor: colors.surfaceElevated,
+                          borderColor: colors.border,
+                          borderWidth: 1,
+                          borderRadius: radii.md,
+                          padding: spacing[3],
+                          color: colors.textPrimary,
+                          minHeight: 110,
+                          textAlignVertical: 'top',
+                        },
+                      ]}
+                      placeholder="Write your trade notes, lessons learned, or reflection..."
+                      placeholderTextColor={colors.textDisabled}
+                      value={value || ''}
+                      onChangeText={onChange}
+                      multiline
+                      numberOfLines={5}
+                    />
                   </View>
-                  <TextInput
-                    style={[typography.body, { color: colors.textPrimary, backgroundColor: colors.surfaceElevated, borderColor: colors.border, borderWidth: 1, borderRadius: radii.md, padding: spacing[4], minHeight: 150, textAlignVertical: 'top' }]}
-                    placeholder="Market context, what went well, lessons for next time..."
-                    placeholderTextColor={colors.textDisabled}
-                    multiline numberOfLines={8}
-                    value={value} onChangeText={onChange}
-                    maxLength={5000}
-                  />
-                  <Text style={[typography.caption, { color: colors.textTertiary, textAlign: 'right', marginTop: 3 }]}>
-                    {(notesValue ?? '').length}/5000
-                  </Text>
-                </View>
-              )} />
+                )}
+              />
 
               <Controller control={control} name="tags" render={({ field: { onChange, value } }) => (
                 <View style={{ marginBottom: spacing[4] }}>
                   <Text style={[typography.label, { color: colors.textSecondary, marginBottom: spacing[2] }]}>Tags</Text>
                   <View style={[styles.tagBox, { backgroundColor: colors.surfaceElevated, borderColor: colors.border, borderRadius: radii.md, padding: spacing[2] }]}>
                     {value.map((tag: string) => (
-                      <TouchableOpacity key={tag} onPress={() => onChange(value.filter((t: string) => t !== tag))} style={[styles.tagChip, { backgroundColor: colors.primarySubtle, borderRadius: radii.sm }]}>
-                        <Text style={[typography.caption, { color: colors.primary }]}>#{tag}</Text>
-                        <Ionicons name="close" size={12} color={colors.primary} style={{ marginLeft: 3 }} />
+                      <TouchableOpacity key={tag} onPress={() => onChange(value.filter((t: string) => t !== tag))} style={[styles.tagChip, { backgroundColor: colors.surfaceHighlight, borderRadius: radii.sm }]}>
+                        <Text style={[typography.caption, { color: colors.textSecondary }]}>#{tag}</Text>
+                        <Ionicons name="close" size={12} color={colors.textTertiary} style={{ marginLeft: 3 }} />
                       </TouchableOpacity>
                     ))}
                     <TextInput
@@ -717,7 +1100,11 @@ export const AddTradeScreen: React.FC = () => {
                         icon="add-outline"
                         selected={false}
                         onPress={() => addTag(t, value, onChange)}
-                        style={{ marginRight: spacing[2], marginBottom: spacing[2] }}
+                        style={{
+                          paddingHorizontal: 11,
+                          paddingVertical: 6,
+                          borderRadius: radii.full,
+                        }}
                       />
                     ))}
                   </View>
@@ -750,26 +1137,31 @@ export const AddTradeScreen: React.FC = () => {
           )}
         </ScrollView>
 
-        <StepNavigationBar
-          onBack={activeSection === 'Trade Info' ? undefined : () => goTo(
-            activeSection === 'Prices' ? 'Trade Info' : activeSection === 'Psychology' ? 'Prices' : 'Psychology'
-          )}
-          onNext={
-            activeSection === 'Notes'
-              ? handleSubmit(onSubmit)
-              : () => goTo(
-                  activeSection === 'Trade Info' ? 'Prices' : activeSection === 'Prices' ? 'Psychology' : 'Notes'
-                )
-          }
-          nextLabel={
-            activeSection === 'Trade Info' ? 'Next: Prices'
-              : activeSection === 'Prices' ? 'Next: Psychology'
-              : activeSection === 'Psychology' ? 'Next: Notes'
-              : 'Save Trade'
-          }
-          nextIcon={activeSection === 'Notes' ? 'check' : 'arrow'}
-          loading={activeSection === 'Notes' && isPending}
-        />
+        {activeSection === 'Notes' ? (
+          <FinalActionBar
+            onBack={() => goTo('Psychology')}
+            onSubmit={handleSubmit(onSubmit, onInvalid)}
+            isPending={isPending || uploadingImages}
+            submitLabel="Log & Save Trade"
+            backLabel="Psychology"
+            gradeBadge={gradeResult.badgeText}
+            gradeColor={gradeResult.color}
+            isRiskBreached={riskAudit.isViolated}
+          />
+        ) : (
+          <StepNavigationBar
+            onBack={activeSection === 'Trade Info' ? undefined : () => goTo(
+              activeSection === 'Prices' ? 'Trade Info' : activeSection === 'Psychology' ? 'Prices' : 'Psychology'
+            )}
+            onNext={handleNextStep}
+            nextLabel={
+              activeSection === 'Trade Info' ? 'Next: Prices'
+                : activeSection === 'Prices' ? 'Next: Psychology'
+                  : 'Next: Notes & Reflection'
+            }
+            nextIcon="arrow"
+          />
+        )}
       </View>
 
       <ImageViewerModal
@@ -807,9 +1199,9 @@ const styles = StyleSheet.create({
   suggestRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 12, borderBottomWidth: StyleSheet.hairlineWidth },
   grid2: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
   grid3: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  chipWrap: { flexDirection: 'row', flexWrap: 'wrap' },
+  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, alignItems: 'center' },
   labelWithIcon: { flexDirection: 'row', alignItems: 'center' },
   tagBox: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, borderWidth: 1 },
-  tagChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4 },
+  tagChip: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 16 },
   favoriteCard: { flexDirection: 'row', alignItems: 'center' },
 });

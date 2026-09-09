@@ -51,24 +51,10 @@ export type TradeSetup =
   | 'liquiditySweepReversal'
   | 'custom';
 export type TradeResult = 'win' | 'loss' | 'breakeven' | 'partialWin';
-export type EmotionBefore = 'confident' | 'fear' | 'greedy' | 'fomo' | 'calm' | 'excited';
-export type EmotionAfter = 'happy' | 'frustrated' | 'angry' | 'satisfied' | 'neutral' | 'regretful';
-export type EmotionDuring = 'calm' | 'anxious' | 'doubtful' | 'tempted_to_close' | 'tempted_to_move_sl' | 'confident_held';
-export type TradeMistake =
-  | 'enteredEarly'
-  | 'lateEntry'
-  | 'noConfirmation'
-  | 'ignoredTrend'
-  | 'riskTooHigh'
-  | 'poorRR'
-  | 'noSL'
-  | 'closedEarly'
-  | 'heldTooLong'
-  | 'modifiedOrderRepeatedly'
-  | 'chasedPrice'
-  | 'noHigherTFCheck'
-  | 'stackedTooManyConfluences'
-  | 'custom';
+export type EmotionBefore = string;
+export type EmotionAfter = string;
+export type EmotionDuring = string;
+export type TradeMistake = string;
 
 export interface Screenshot {
   url: string;
@@ -97,7 +83,9 @@ export interface Trade {
   rMultiple?: number;
   tradeDurationMinutes?: number;
   session: TradeSession;
-  setup?: TradeSetup;
+  strategy?: string;
+  setup?: string;
+  confluences?: string[];
   customSetup?: string;
   result: TradeResult;
   emotionBefore?: EmotionBefore;
@@ -115,11 +103,15 @@ export interface Trade {
   sizedCorrectly: boolean;
   withinDailyLossLimit: boolean;
   singleTradeDominance: boolean;
+  checklist?: string[];
   mistakes: TradeMistake[];
   customMistake?: string;
   screenshots: Screenshot[];
   reasonForEntry?: string;
   notes?: string;
+  keyTakeaway?: string;
+  whatWentWell?: string;
+  whatToImprove?: string;
   tags: string[];
   isFavorite: boolean;
   createdAt: string;
@@ -141,7 +133,9 @@ export interface CreateTradePayload {
   riskPercent: number;
   pnlAmount?: number; // Phase 2: monetary P&L amount
   session: TradeSession;
-  setup?: TradeSetup;
+  strategy?: string;
+  setup?: string;
+  confluences?: string[];
   customSetup?: string;
   result: TradeResult;
   emotionBefore?: EmotionBefore;
@@ -159,10 +153,14 @@ export interface CreateTradePayload {
   sizedCorrectly: boolean;
   withinDailyLossLimit: boolean;
   singleTradeDominance: boolean;
+  checklist?: string[];
   mistakes: TradeMistake[];
   customMistake?: string;
   reasonForEntry?: string;
   notes?: string;
+  keyTakeaway?: string;
+  whatWentWell?: string;
+  whatToImprove?: string;
   tags: string[];
   isFavorite: boolean;
 }
@@ -209,6 +207,7 @@ export interface CalendarDay {
   date: string;
   trades: number;
   netRR: number;
+  netPnL?: number;
   wins: number;
   losses: number;
 }

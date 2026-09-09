@@ -1,119 +1,90 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { VictoryPie } from 'victory-native';
+import { View, Text, StyleSheet, Platform } from 'react-native';
+import Svg, { Circle } from 'react-native-svg';
 import { useTheme } from '../../theme';
-import {
-  getDisciplineScoreColor,
-  getDisciplineScoreLabel,
-} from '../../utils/formatters';
 
 interface DisciplineRingProps {
   score: number;
   size?: number;
-  showLabel?: boolean;
-  breakdown?: {
-    planFollowed: number;
-    noRevengeTrade: number;
-    noOvertrading: number;
-    noMovedSL: number;
-  };
+  subtitle?: string;
+  hasTrades?: boolean;
 }
 
-export const DisciplineRing: React.FC<DisciplineRingProps> = ({
-  score,
-  size = 120,
-  showLabel = true,
-  breakdown,
-}) => {
-  const { colors, typography, spacing } = useTheme();
-  const scoreColor = getDisciplineScoreColor(score, colors);
-  const scoreLabel = getDisciplineScoreLabel(score);
+const fontBase = {
+  fontFamily: Platform.select({ ios: 'System', android: 'sans-serif' }),
+  includeFontPadding: false,
+};
 
-  const ringData = [
-    { x: 'score', y: score },
-    { x: 'remaining', y: 100 - score },
-  ];
+export const DisciplineRing: React.FC<DisciplineRingProps> = ({
+  score = 0,
+  size = 110,
+  subtitle,
+  hasTrades = true,
+}) => {
+  const { colors, isDark } = useTheme();
+
+  const currentScore = hasTrades ? Math.min(Math.max(score ?? 0, 0), 100) : 0;
+
+  // Full 360-degree circular progress ring matching WinLossPie
+  const strokeWidth = 9;
+  const radius = (size - 18) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (currentScore / 100) * circumference;
+
+  const feedbackText = subtitle || (
+    !hasTrades || currentScore === 0 ? 'No trades in this period' :
+    currentScore >= 80 ? 'Exceptional rule adherence!' :
+    currentScore >= 60 ? 'Consistent, but room to improve.' :
+    'Focus on emotional control.'
+  );
+
+  const gaugeColor = !hasTrades || currentScore === 0
+    ? (isDark ? '#64748B' : '#94A3B8')
+    : currentScore >= 75 ? '#10B981' : currentScore >= 50 ? '#F59E0B' : '#EF4444';
 
   return (
     <View style={styles.container}>
-      <View style={[styles.ringWrap, { width: size, height: size }]}>
-        <VictoryPie
-          data={ringData}
-          width={size}
-          height={size}
-          padding={0}
-          innerRadius={size * 0.38}
-          colorScale={[scoreColor, colors.surfaceHighlight]}
-          labels={() => null}
-          startAngle={-120}
-          endAngle={120}
-          style={{
-            data: {
-              stroke: 'transparent',
-            },
-          }}
-        />
-        <View style={styles.centerContent}>
-          <Text
-            style={[
-              typography.numeric,
-              { color: scoreColor, fontSize: size * 0.22 },
-            ]}
-          >
-            {score}
-          </Text>
-          <Text style={[typography.caption, { color: colors.textTertiary }]}>
-            / 100
-          </Text>
+      {/* Closed 360-degree Progress Ring */}
+      <View style={[styles.gaugeWrap, { width: size, height: size }]}>
+        <Svg width={size} height={size}>
+          {/* Background Track Circle (Full 360°) */}
+          <Circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            stroke={isDark ? 'rgba(255,255,255,0.08)' : '#E2E8F0'}
+            strokeWidth={strokeWidth}
+            fill="none"
+          />
+
+          {/* Active Filled Progress Circle */}
+          {currentScore > 0 && (
+            <Circle
+              cx={size / 2}
+              cy={size / 2}
+              r={radius}
+              stroke={gaugeColor}
+              strokeWidth={strokeWidth}
+              strokeDasharray={`${circumference} ${circumference}`}
+              strokeDashoffset={strokeDashoffset}
+              strokeLinecap="round"
+              fill="none"
+              transform={`rotate(-90 ${size / 2} ${size / 2})`}
+            />
+          )}
+        </Svg>
+
+        {/* Center Score */}
+        <View style={styles.centerText}>
+          <Text style={[styles.scoreNumber, { color: gaugeColor }]}>{currentScore}</Text>
+          <Text style={[styles.scoreTotal, { color: colors.textTertiary }]}>/ 100</Text>
         </View>
       </View>
 
-      {showLabel && (
-        <Text
-          style={[
-            typography.label,
-            { color: scoreColor, marginTop: spacing[2], textAlign: 'center' },
-          ]}
-        >
-          {scoreLabel}
-        </Text>
-      )}
-
-      {breakdown && (
-        <View style={[styles.breakdown, { marginTop: spacing[4] }]}>
-          {[
-            { label: 'Plan Followed', value: breakdown.planFollowed },
-            { label: 'No Revenge', value: breakdown.noRevengeTrade },
-            { label: 'No Overtrading', value: breakdown.noOvertrading },
-            { label: 'SL Respected', value: breakdown.noMovedSL },
-          ].map((item) => (
-            <View key={item.label} style={[styles.breakdownRow, { marginBottom: spacing[2] }]}>
-              <Text style={[typography.caption, { color: colors.textSecondary, flex: 1 }]}>
-                {item.label}
-              </Text>
-              <View style={[styles.barTrack, { backgroundColor: colors.surfaceHighlight }]}>
-                <View
-                  style={[
-                    styles.barFill,
-                    {
-                      width: `${item.value}%`,
-                      backgroundColor:
-                        item.value >= 80
-                          ? colors.success
-                          : item.value >= 60
-                          ? colors.warning
-                          : colors.error,
-                    },
-                  ]}
-                />
-              </View>
-              <Text style={[typography.caption, { color: colors.textTertiary, width: 36, textAlign: 'right' }]}>
-                {item.value}%
-              </Text>
-            </View>
-          ))}
-        </View>
-      )}
+      {/* Subtitle feedback */}
+      <Text style={[styles.feedback, { color: colors.textTertiary }]}>
+        {feedbackText}
+      </Text>
     </View>
   );
 };
@@ -122,31 +93,34 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
   },
-  ringWrap: {
+  gaugeWrap: {
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  centerContent: {
+  centerText: {
     position: 'absolute',
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  breakdown: {
-    width: '100%',
+  scoreNumber: {
+    ...fontBase,
+    fontSize: 24,
+    fontWeight: '800',
+    letterSpacing: -0.5,
   },
-  breakdownRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  scoreTotal: {
+    ...fontBase,
+    fontSize: 10.5,
+    fontWeight: '600',
+    marginTop: -2,
   },
-  barTrack: {
-    flex: 1,
-    height: 4,
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  barFill: {
-    height: '100%',
-    borderRadius: 2,
+  feedback: {
+    ...fontBase,
+    fontSize: 11,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginTop: 4,
+    paddingHorizontal: 4,
   },
 });

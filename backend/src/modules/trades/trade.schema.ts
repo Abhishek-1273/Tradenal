@@ -38,13 +38,15 @@ export const createTradeSchema = z.object({
   pnlAmount: z.number().optional(), // Phase 2: monetary P&L amount
 
   session: z.enum(SESSIONS),
-  setup: z.enum(SETUPS).optional(),
+  strategy: z.string().max(100).optional(),
+  setup: z.string().max(100).optional(),
+  confluences: z.array(z.string().max(100)).default([]),
   customSetup: z.string().max(100).optional(),
   result: z.enum(RESULTS),
 
-  emotionBefore: z.enum(EMOTIONS_BEFORE).optional(),
-  emotionDuring: z.enum(EMOTIONS_DURING).optional(),
-  emotionAfter: z.enum(EMOTIONS_AFTER).optional(),
+  emotionBefore: z.string().max(100).optional(),
+  emotionDuring: z.string().max(100).optional(),
+  emotionAfter: z.string().max(100).optional(),
   confluenceCount: z.number().int().min(0).max(20).default(0),
   followedPlan: z.boolean().default(true),
   overtraded: z.boolean().default(false),
@@ -57,11 +59,15 @@ export const createTradeSchema = z.object({
   sizedCorrectly: z.boolean().default(true),
   withinDailyLossLimit: z.boolean().default(true),
   singleTradeDominance: z.boolean().default(true),
-  mistakes: z.array(z.enum(MISTAKES)).default([]),
+  checklist: z.array(z.string()).default([]),
+  mistakes: z.array(z.string()).default([]),
   customMistake: z.string().max(200).optional(),
 
   reasonForEntry: z.string().max(1000).optional(),
   notes: z.string().max(5000).optional(),
+  keyTakeaway: z.string().max(2000).optional(),
+  whatWentWell: z.string().max(2000).optional(),
+  whatToImprove: z.string().max(2000).optional(),
   tags: z.array(z.string().max(50)).default([]),
   isFavorite: z.boolean().default(false),
 });
@@ -73,6 +79,7 @@ export const tradeFiltersSchema = z.object({
   pair: z.string().optional(),
   result: z.string().optional(),
   session: z.string().optional(),
+  strategy: z.string().optional(),
   setup: z.string().optional(),
   emotionBefore: z.string().optional(),
   mistakes: z.string().optional(), // comma-separated

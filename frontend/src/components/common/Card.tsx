@@ -11,24 +11,41 @@ interface CardProps {
   gradientColors?: string[];
   padding?: number;
   noPadding?: boolean;
+  glow?: 'primary' | 'success' | 'danger' | 'warning' | 'none';
+  borderHighlight?: boolean;
 }
 
 export const Card: React.FC<CardProps> = ({
   children,
   style,
   onPress,
-  gradient = false,
+  gradient = true,
   gradientColors,
   padding,
   noPadding = false,
+  glow = 'none',
+  borderHighlight = false,
 }) => {
   const { colors, radii, shadows, spacing } = useTheme();
 
   const defaultPadding = noPadding ? 0 : padding ?? spacing[4];
 
+  const getGlowBorder = () => {
+    switch (glow) {
+      case 'primary': return colors.primaryGlow;
+      case 'success': return colors.successGlow;
+      case 'danger':  return colors.errorGlow;
+      case 'warning': return colors.warningGlow;
+      default: return borderHighlight ? colors.primarySubtle : colors.border;
+    }
+  };
+
   const cardStyle: ViewStyle = {
     borderRadius: radii.xl,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: getGlowBorder(),
+    backgroundColor: colors.surface,
     ...shadows.md,
     ...style,
   };
@@ -57,7 +74,7 @@ export const Card: React.FC<CardProps> = ({
     return (
       <TouchableOpacity
         onPress={onPress}
-        activeOpacity={0.85}
+        activeOpacity={0.82}
         style={cardStyle}
       >
         {background}
@@ -73,3 +90,4 @@ export const Card: React.FC<CardProps> = ({
     </View>
   );
 };
+

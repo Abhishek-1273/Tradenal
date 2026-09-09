@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, Platform } from 'react-native';
+import { View, Text, Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,8 +8,8 @@ import { TabParamList } from './types';
 
 import { DashboardScreen } from '../screens/dashboard/DashboardScreen';
 import { TradeListScreen } from '../screens/trades/TradeListScreen';
-import { CalendarScreen } from '../screens/calendar/CalendarScreen';
 import { AnalyticsScreen } from '../screens/analytics/AnalyticsScreen';
+import { CalendarScreen } from '../screens/calendar/CalendarScreen';
 import { MoreScreen } from '../screens/settings/MoreScreen';
 
 const Tab = createBottomTabNavigator<TabParamList>();
@@ -21,16 +21,23 @@ type TabIcon = {
 };
 
 const TAB_ICONS: Record<string, TabIcon> = {
-  Dashboard: { name: 'Dashboard', icon: 'grid-outline', activeIcon: 'grid' },
-  Trades: { name: 'Journal', icon: 'journal-outline', activeIcon: 'journal' },
+  Dashboard: { name: 'Dashboard', icon: 'home-outline', activeIcon: 'home' },
+  Trades: { name: 'Journal', icon: 'document-text-outline', activeIcon: 'document-text' },
+  Analytics: { name: 'Analytics', icon: 'stats-chart-outline', activeIcon: 'stats-chart' },
   Calendar: { name: 'Calendar', icon: 'calendar-outline', activeIcon: 'calendar' },
-  Analytics: { name: 'Analytics', icon: 'bar-chart-outline', activeIcon: 'bar-chart' },
   More: { name: 'More', icon: 'ellipsis-horizontal-outline', activeIcon: 'ellipsis-horizontal' },
 };
 
 export const BottomTabNavigator: React.FC = () => {
-  const { colors, spacing } = useTheme();
+  const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
+  const isAndroid = Platform.OS === 'android';
+
+  const safeBottom = Math.max(insets.bottom, isAndroid ? 10 : 8);
+  const tabHeight = isAndroid ? 62 + safeBottom : 58 + insets.bottom;
+
+  const activeColor = isDark ? '#FFFFFF' : '#0F172A';
+  const inactiveColor = isDark ? '#64748B' : '#94A3B8';
 
   return (
     <Tab.Navigator
@@ -40,45 +47,61 @@ export const BottomTabNavigator: React.FC = () => {
         tabBarStyle: {
           backgroundColor: colors.surface,
           borderTopColor: colors.border,
-          borderTopWidth: StyleSheet.hairlineWidth,
-          height: 56 + insets.bottom,
-          paddingBottom: insets.bottom,
-          paddingTop: 4,
+          borderTopWidth: 1,
+          height: tabHeight,
+          paddingBottom: safeBottom,
+          paddingTop: 6,
+          elevation: 16,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.15,
+          shadowRadius: 8,
         },
-        tabBarIcon: ({ focused, color, size }) => {
+        tabBarIcon: ({ focused }) => {
           const tab = TAB_ICONS[route.name];
           return (
-            <Ionicons
-              name={(focused ? tab.activeIcon : tab.icon) as any}
-              size={22}
-              color={color}
-            />
+            <View
+              style={{
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingVertical: 2,
+              }}
+            >
+              <Ionicons
+                name={(focused ? tab.activeIcon : tab.icon) as any}
+                size={22}
+                color={focused ? activeColor : inactiveColor}
+              />
+            </View>
           );
         },
-        tabBarLabel: ({ focused, color }) => {
+        tabBarLabel: ({ focused }) => {
           const tab = TAB_ICONS[route.name];
           return (
             <Text
               style={{
-                fontSize: 10,
-                fontWeight: focused ? '600' : '400',
-                color,
+                fontSize: 10.5,
+                fontWeight: focused ? '700' : '500',
+                color: focused ? activeColor : inactiveColor,
                 letterSpacing: 0.2,
-                marginTop: -2,
+                marginTop: 2,
+                fontFamily: Platform.select({ ios: 'System', android: 'sans-serif' }),
+                includeFontPadding: false,
               }}
+              numberOfLines={1}
             >
               {tab.name}
             </Text>
           );
         },
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textTertiary,
+        tabBarActiveTintColor: activeColor,
+        tabBarInactiveTintColor: inactiveColor,
       })}
     >
       <Tab.Screen name="Dashboard" component={DashboardScreen} />
       <Tab.Screen name="Trades" component={TradeListScreen} />
-      <Tab.Screen name="Calendar" component={CalendarScreen} />
       <Tab.Screen name="Analytics" component={AnalyticsScreen} />
+      <Tab.Screen name="Calendar" component={CalendarScreen} />
       <Tab.Screen name="More" component={MoreScreen} />
     </Tab.Navigator>
   );

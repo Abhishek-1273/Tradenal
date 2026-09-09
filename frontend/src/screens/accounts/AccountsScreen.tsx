@@ -57,7 +57,7 @@ const parseGmtOffset = (val: string): number => {
 };
 
 export const AccountsScreen: React.FC = () => {
-  const { colors, typography, spacing, radii } = useTheme();
+  const { colors, typography, spacing, radii, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const { showToast } = useToast();
 
@@ -488,7 +488,7 @@ export const AccountsScreen: React.FC = () => {
               style={[
                 styles.saveButton,
                 {
-                  backgroundColor: colors.primary,
+                  backgroundColor: isDark ? '#FFFFFF' : '#0F172A',
                   borderRadius: radii.lg,
                   paddingVertical: spacing[3.5],
                   marginTop: spacing[4],
@@ -496,9 +496,9 @@ export const AccountsScreen: React.FC = () => {
               ]}
             >
               {(createMutation.isPending || updateMutation.isPending) ? (
-                <ActivityIndicator color="#fff" size="small" />
+                <ActivityIndicator color={isDark ? '#0F172A' : '#FFFFFF'} size="small" />
               ) : (
-                <Text style={[typography.h3, { color: '#fff' }]}>Save Account</Text>
+                <Text style={[typography.h3, { color: isDark ? '#0F172A' : '#FFFFFF' }]}>Save Account</Text>
               )}
             </TouchableOpacity>
           </ScrollView>

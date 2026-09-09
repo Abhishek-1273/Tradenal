@@ -41,7 +41,7 @@ export const Button: React.FC<ButtonProps> = ({
   style,
   textStyle,
 }) => {
-  const { colors, radii, typography } = useTheme();
+  const { colors, radii, typography, shadows, isDark } = useTheme();
 
   const isDisabled = disabled || loading;
 
@@ -65,6 +65,7 @@ export const Button: React.FC<ButtonProps> = ({
   const getTextColor = (): string => {
     switch (variant) {
       case 'primary':
+        return isDark ? '#0F172A' : '#ffffff';
       case 'danger':
       case 'success':
         return '#ffffff';
@@ -79,9 +80,12 @@ export const Button: React.FC<ButtonProps> = ({
 
   const containerStyle: ViewStyle = {
     width: fullWidth ? '100%' : undefined,
-    opacity: isDisabled ? 0.5 : 1,
-    borderRadius: radii.lg,
+    opacity: isDisabled ? 0.45 : 1,
+    borderRadius: radii.xl,
     overflow: 'hidden',
+    ...(variant === 'primary' ? shadows.glow(colors.primaryGlow) : {}),
+    ...(variant === 'success' ? shadows.glow(colors.successGlow) : {}),
+    ...(variant === 'danger' ? shadows.glow(colors.errorGlow) : {}),
     ...style,
   };
 
@@ -113,7 +117,7 @@ export const Button: React.FC<ButtonProps> = ({
             ellipsizeMode="clip"
             style={[
               styles.label,
-              { fontSize: sz.fontSize, color: getTextColor(), fontWeight: '600', flexShrink: 1 },
+              { fontSize: sz.fontSize, color: getTextColor(), fontWeight: '700', letterSpacing: 0.3, flexShrink: 1 },
               textStyle,
             ]}
           >
@@ -130,14 +134,14 @@ export const Button: React.FC<ButtonProps> = ({
       <TouchableOpacity
         onPress={onPress}
         disabled={isDisabled}
-        activeOpacity={0.8}
+        activeOpacity={0.82}
         style={containerStyle}
       >
         <LinearGradient
           colors={getGradientColors()}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
-          style={{ borderRadius: radii.lg }}
+          style={{ borderRadius: radii.xl }}
         >
           {content}
         </LinearGradient>
@@ -149,8 +153,8 @@ export const Button: React.FC<ButtonProps> = ({
     <TouchableOpacity
       onPress={onPress}
       disabled={isDisabled}
-      activeOpacity={0.75}
-      style={[containerStyle, { borderRadius: radii.lg }]}
+      activeOpacity={0.8}
+      style={[containerStyle, { borderRadius: radii.xl }]}
     >
       {content}
     </TouchableOpacity>
@@ -169,3 +173,4 @@ const styles = StyleSheet.create({
   iconLeft: { marginRight: 8 },
   iconRight: { marginLeft: 8 },
 });
+

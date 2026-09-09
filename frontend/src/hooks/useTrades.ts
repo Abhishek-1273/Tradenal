@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { tradesApi } from '../api/trades.api';
-import { statsApi, goalsApi, aiApi } from '../api/stats.api';
+import { statsApi, aiApi } from '../api/stats.api';
 import { patternsApi } from '../api/stats.api';
 import { useUIStore } from '../store/ui.store';
 import { useAccountStore } from '../store/account.store';
@@ -24,12 +24,6 @@ export const statsKeys = {
   calendar: (year: number, month: number, accountId?: string) => [...statsKeys.all, 'calendar', year, month, accountId || ''] as const,
   calendarDay: (date: string, accountId?: string) => [...statsKeys.all, 'calendarDay', date, accountId || ''] as const,
   discipline: (period: string, accountId?: string) => [...statsKeys.all, 'discipline', period, accountId || ''] as const,
-};
-
-export const goalKeys = {
-  all: ['goals'] as const,
-  recent: (accountId?: string) => [...goalKeys.all, 'recent', accountId || ''] as const,
-  month: (month: string, accountId?: string) => [...goalKeys.all, month, accountId || ''] as const,
 };
 
 export const reviewKeys = {
@@ -108,29 +102,29 @@ export const useToggleFavorite = () => {
 };
 
 export const useTags = () => {
-  const { activeAccount } = useAccountStore();
+  const activeAccount = useAccountStore((s) => s.activeAccount);
   const accountId = activeAccount?._id;
   return useQuery({
     queryKey: tradeKeys.tags(accountId),
-    queryFn: () => tradesApi.getTags(), // endpoint takes authorization, backend resolves accountId from token/resolve helper
+    queryFn: () => tradesApi.getTags(accountId),
     staleTime: 5 * 60 * 1000,
   });
 };
 
 export const usePairs = () => {
-  const { activeAccount } = useAccountStore();
+  const activeAccount = useAccountStore((s) => s.activeAccount);
   const accountId = activeAccount?._id;
   return useQuery({
     queryKey: tradeKeys.pairs(accountId),
-    queryFn: () => tradesApi.getPairs(), // endpoint takes authorization, backend resolves accountId
+    queryFn: () => tradesApi.getPairs(accountId),
     staleTime: 5 * 60 * 1000,
   });
 };
 
 // ─── Stats Hooks ──────────────────────────────────────────────────────────────
 export const useDashboard = () => {
-  const { dashboardPeriod } = useUIStore();
-  const { activeAccount } = useAccountStore();
+  const dashboardPeriod = useUIStore((s) => s.dashboardPeriod);
+  const activeAccount = useAccountStore((s) => s.activeAccount);
   const accountId = activeAccount?._id;
   return useQuery({
     queryKey: statsKeys.dashboard(dashboardPeriod, accountId),
@@ -140,7 +134,7 @@ export const useDashboard = () => {
 };
 
 export const useAnalytics = (startDate?: string, endDate?: string) => {
-  const { activeAccount } = useAccountStore();
+  const activeAccount = useAccountStore((s) => s.activeAccount);
   const accountId = activeAccount?._id;
   return useQuery({
     queryKey: statsKeys.analytics(startDate, endDate, accountId),
@@ -150,7 +144,7 @@ export const useAnalytics = (startDate?: string, endDate?: string) => {
 };
 
 export const useCalendar = (year: number, month: number) => {
-  const { activeAccount } = useAccountStore();
+  const activeAccount = useAccountStore((s) => s.activeAccount);
   const accountId = activeAccount?._id;
   return useQuery({
     queryKey: statsKeys.calendar(year, month, accountId),
@@ -179,39 +173,6 @@ export const useDisciplineScore = (period: 'week' | 'month' | 'all' = 'month') =
   });
 };
 
-// ─── Goals Hooks ──────────────────────────────────────────────────────────────
-export const useRecentGoals = () => {
-  const { activeAccount } = useAccountStore();
-  const accountId = activeAccount?._id;
-  return useQuery({
-    queryKey: goalKeys.recent(accountId),
-    queryFn: () => goalsApi.getRecentGoals(accountId),
-    staleTime: 5 * 60 * 1000,
-  });
-};
-
-export const useGoal = (month: string) => {
-  const { activeAccount } = useAccountStore();
-  const accountId = activeAccount?._id;
-  return useQuery({
-    queryKey: goalKeys.month(month, accountId),
-    queryFn: () => goalsApi.getGoal(month, accountId),
-    enabled: !!month,
-    staleTime: 3 * 60 * 1000,
-  });
-};
-
-export const useCreateGoal = () => {
-  const queryClient = useQueryClient();
-  const { activeAccount } = useAccountStore();
-  return useMutation({
-    mutationFn: (data: Parameters<typeof goalsApi.createOrUpdateGoal>[0]) =>
-      goalsApi.createOrUpdateGoal({ ...data, accountId: data.accountId || activeAccount?._id }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: goalKeys.all });
-    },
-  });
-};
 
 export const useReviews = (type: 'weekly' | 'monthly', limit = 10, accountId?: string) => {
   return useQuery({
@@ -232,7 +193,8 @@ export const useLatestReview = (type: 'weekly' | 'monthly', accountId?: string) 
 export const useGenerateWeeklyReview = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (accountId?: string) => aiApi.generateWeeklyReview(accountId),
+    mutationFn: (params?: { accountId?: string; rules?: any[] } | string) =>
+      aiApi.generateWeeklyReview(params),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: reviewKeys.all });
     },
@@ -242,7 +204,8 @@ export const useGenerateWeeklyReview = () => {
 export const useGenerateMonthlyReview = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (accountId?: string) => aiApi.generateMonthlyReview(accountId),
+    mutationFn: (params?: { accountId?: string; rules?: any[] } | string) =>
+      aiApi.generateMonthlyReview(params),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: reviewKeys.all });
     },

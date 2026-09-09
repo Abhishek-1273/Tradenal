@@ -2,6 +2,7 @@ import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration';
 import isToday from 'dayjs/plugin/isToday';
 import isYesterday from 'dayjs/plugin/isYesterday';
+import { ALL_MISTAKE_ITEMS } from '../constants';
 
 dayjs.extend(duration);
 dayjs.extend(isToday);
@@ -42,15 +43,32 @@ export const calcRMultiple = (
   return parseFloat((actualReturn / riskPerUnit).toFixed(2));
 };
 
+export const getContractSize = (pair?: string): number => {
+  if (!pair) return 100000;
+  const p = pair.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (p.includes('XAU') || p.includes('GOLD')) return 100;
+  if (p.includes('XAG') || p.includes('SILVER')) return 5000;
+  if (p.includes('BTC') || p.includes('ETH') || p.includes('SOL') || p.includes('CRYPTO')) return 1;
+  if (
+    p.includes('US30') || p.includes('NAS100') || p.includes('SPX500') ||
+    p.includes('GER30') || p.includes('DAX') || p.includes('DJ30') ||
+    p.includes('US100') || p.includes('US500') || p.includes('NDX') || p.includes('WS30')
+  ) return 1;
+  if (p.includes('OIL') || p.includes('WTI') || p.includes('BRENT')) return 1000;
+  return 100000;
+};
+
 export const calcPnL = (
   tradeType: 'buy' | 'sell',
   entryPrice: number,
   exitPrice: number,
-  lotSize: number
+  lotSize: number,
+  pair?: string
 ): number => {
   const direction = tradeType === 'buy' ? 1 : -1;
   const priceDiff = (exitPrice - entryPrice) * direction;
-  return parseFloat((priceDiff * lotSize * 100000).toFixed(2));
+  const contractSize = getContractSize(pair);
+  return parseFloat((priceDiff * lotSize * contractSize).toFixed(2));
 };
 
 // ─── Formatters ───────────────────────────────────────────────────────────────
@@ -217,21 +235,63 @@ export const getEmotionDuringEmoji = (emotion: string): string => {
   return map[emotion] || '😐';
 };
 
+export const getEmotionBeforeLabel = (emotion: string): string => {
+  const labels: Record<string, string> = {
+    calm_patient: 'Calm & Patient',
+    confident: 'Confident (Rule-Based)',
+    fomo_chasing: 'FOMO / Chasing',
+    fearful_hesitant: 'Fearful / Hesitant',
+    bored_forcing: 'Bored / Forcing',
+    greedy_impulsive: 'Greedy / Impulsive',
+    calm: 'Calm & Patient',
+    fear: 'Fearful / Hesitant',
+    greedy: 'Greedy / Impulsive',
+    fomo: 'FOMO / Chasing',
+    bored: 'Bored / Forcing',
+  };
+  return labels[emotion] || emotion;
+};
+
 export const getEmotionDuringLabel = (emotion: string): string => {
   const labels: Record<string, string> = {
-    calm: 'Calm',
-    anxious: 'Anxious',
-    doubtful: 'Doubtful',
-    tempted_to_close: 'Tempted to Close',
-    tempted_to_move_sl: 'Tempted to Move SL',
+    calm_detached: 'Calm & Detached',
+    anxious_tick_watching: 'Anxious / Watching',
+    tempted_to_close: 'Tempted Close Early',
+    tempted_to_move_sl: 'Tempted Move SL',
+    tempted_to_add: 'Tempted Add Size',
+    doubtful_overthinking: 'Doubtful / Panic',
+    calm: 'Calm & Detached',
+    anxious: 'Anxious / Watching',
+    doubtful: 'Doubtful / Panic',
     confident_held: 'Confident & Held',
   };
   return labels[emotion] || emotion;
 };
 
-export const getMistakeLabel = (mistake: string): string => {
+export const getEmotionAfterLabel = (emotion: string): string => {
   const labels: Record<string, string> = {
-    enteredEarly: 'Entered Early',
+    disciplined: 'Disciplined',
+    neutral_objective: 'Neutral / Objective',
+    relieved_lucky: 'Relieved (Lucky)',
+    frustrated_angry: 'Frustrated / Angry',
+    regretful: 'Regretful (Broke Rules)',
+    revenge_urge: 'Revenge Urge',
+    neutral: 'Neutral / Objective',
+    relieved: 'Relieved (Lucky)',
+    frustrated: 'Frustrated / Angry',
+    angry: 'Frustrated / Angry',
+    satisfied: 'Disciplined',
+    proud: 'Disciplined',
+  };
+  return labels[emotion] || emotion;
+};
+
+export const getMistakeLabel = (mistake: string): string => {
+  const item = ALL_MISTAKE_ITEMS.find((m) => m.id === mistake);
+  if (item) return item.label;
+
+  const legacyLabels: Record<string, string> = {
+    enteredEarly: 'Jumped Early',
     lateEntry: 'Late Entry',
     noConfirmation: 'No Confirmation',
     ignoredTrend: 'Ignored Trend',
@@ -246,7 +306,7 @@ export const getMistakeLabel = (mistake: string): string => {
     stackedTooManyConfluences: 'Too Many Confluences',
     custom: 'Other',
   };
-  return labels[mistake] || mistake;
+  return legacyLabels[mistake] || mistake;
 };
 
 // ─── Score helpers ─────────────────────────────────────────────────────────────

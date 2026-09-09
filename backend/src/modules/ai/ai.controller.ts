@@ -5,16 +5,16 @@ import { sendSuccess } from '../../utils/apiResponse';
 
 export const generateWeeklyReview = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { accountId } = req.body;
-    const review = await aiService.generateWeeklyReview(req.userId!, accountId);
+    const { accountId, rules } = req.body;
+    const review = await aiService.generateWeeklyReview(req.userId!, accountId, rules);
     sendSuccess(res, review, 'Weekly review generated');
   } catch (error) { next(error); }
 };
 
 export const generateMonthlyReview = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { accountId } = req.body;
-    const review = await aiService.generateMonthlyReview(req.userId!, accountId);
+    const { accountId, rules } = req.body;
+    const review = await aiService.generateMonthlyReview(req.userId!, accountId, rules);
     sendSuccess(res, review, 'Monthly review generated');
   } catch (error) { next(error); }
 };

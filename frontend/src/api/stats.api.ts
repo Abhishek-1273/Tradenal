@@ -100,13 +100,15 @@ export const aiApi = {
     return res.data.data || null;
   },
 
-  generateWeeklyReview: async (accountId?: string): Promise<Review> => {
-    const res = await apiClient.post<ApiResponse<Review>>('/ai/generate/weekly', { accountId }, { timeout: 90000 });
+  generateWeeklyReview: async (params?: { accountId?: string; rules?: any[] } | string): Promise<Review> => {
+    const payload = typeof params === 'string' ? { accountId: params } : (params || {});
+    const res = await apiClient.post<ApiResponse<Review>>('/ai/generate/weekly', payload, { timeout: 90000 });
     return res.data.data!;
   },
 
-  generateMonthlyReview: async (accountId?: string): Promise<Review> => {
-    const res = await apiClient.post<ApiResponse<Review>>('/ai/generate/monthly', { accountId }, { timeout: 90000 });
+  generateMonthlyReview: async (params?: { accountId?: string; rules?: any[] } | string): Promise<Review> => {
+    const payload = typeof params === 'string' ? { accountId: params } : (params || {});
+    const res = await apiClient.post<ApiResponse<Review>>('/ai/generate/monthly', payload, { timeout: 90000 });
     return res.data.data!;
   },
 };

@@ -1,6 +1,11 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { useTheme } from '../../theme';
+
+const fontBase = {
+  fontFamily: Platform.select({ ios: 'System', android: 'sans-serif' }),
+  includeFontPadding: false,
+};
 
 interface CalendarDayCellProps {
   day: number;
@@ -10,6 +15,8 @@ interface CalendarDayCellProps {
   isPositive: boolean;
   isNeutral: boolean;
   tradeCount: number;
+  netRR?: number;
+  netPnL?: number;
   onPress: () => void;
 }
 
@@ -21,43 +28,82 @@ export const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
   isPositive,
   isNeutral,
   tradeCount,
+  netRR,
   onPress,
 }) => {
-  const { colors, typography, radii } = useTheme();
+  const { colors, isDark } = useTheme();
 
-  const statusColor = isNeutral ? colors.warning : isPositive ? colors.success : colors.error;
+  const statusColor = isNeutral ? '#F59E0B' : isPositive ? '#10B981' : '#EF4444';
+  const statusBg = isNeutral
+    ? isDark ? 'rgba(245, 158, 11, 0.16)' : 'rgba(245, 158, 11, 0.12)'
+    : isPositive
+    ? isDark ? 'rgba(16, 185, 129, 0.16)' : 'rgba(16, 185, 129, 0.12)'
+    : isDark ? 'rgba(239, 68, 68, 0.16)' : 'rgba(239, 68, 68, 0.12)';
 
-  const bg = isSelected ? colors.primary : hasData ? statusColor + '1c' : 'transparent';
+  const bg = isSelected
+    ? colors.primary
+    : hasData
+    ? statusBg
+    : 'transparent';
 
-  const textColor = isSelected ? '#fff' : hasData ? statusColor : isToday ? colors.primary : colors.textSecondary;
+  const dayTextColor = isSelected
+    ? (isDark ? '#0F172A' : '#FFFFFF')
+    : hasData
+    ? (isDark ? '#FFFFFF' : '#0F172A')
+    : isToday
+    ? colors.primary
+    : colors.textSecondary;
+
+  const returnTextColor = isSelected
+    ? (isDark
+        ? (isPositive ? '#047857' : isNeutral ? '#B45309' : '#B91C1C')
+        : (isPositive ? '#34D399' : isNeutral ? '#FBBF24' : '#FB7185'))
+    : statusColor;
 
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={styles.touchable}>
+    <TouchableOpacity onPress={onPress} activeOpacity={0.72} style={styles.touchable}>
       <View
         style={[
           styles.inner,
           {
             backgroundColor: bg,
-            borderRadius: radii.md,
-            borderWidth: isToday && !isSelected ? 1.5 : 0,
-            borderColor: colors.primary,
+            borderRadius: 10,
+            borderWidth: isSelected
+              ? 2
+              : isToday
+              ? 1.5
+              : hasData
+              ? 1
+              : 0,
+            borderColor: isSelected
+              ? isDark ? '#FFFFFF' : '#0F172A'
+              : isToday
+              ? colors.primary
+              : hasData
+              ? isNeutral
+                ? 'rgba(245, 158, 11, 0.35)'
+                : isPositive
+                ? 'rgba(16, 185, 129, 0.35)'
+                : 'rgba(239, 68, 68, 0.35)'
+              : 'transparent',
           },
         ]}
       >
-        <Text style={[typography.labelSm, { color: textColor, fontWeight: isSelected || isToday ? '700' : '500' }]}>
+        <Text style={[styles.dayText, { color: dayTextColor, fontWeight: isSelected || isToday || hasData ? '700' : '500' }]}>
           {day}
         </Text>
-        {hasData && (
-          <View style={styles.indicatorRow}>
-            <View
+
+        {hasData && tradeCount > 0 && (
+          <View style={styles.returnWrap}>
+            <Text
               style={[
-                styles.dot,
-                { backgroundColor: isSelected ? '#fff' : statusColor },
+                styles.returnText,
+                { color: returnTextColor },
               ]}
-            />
-            {tradeCount > 1 && (
-              <Text style={[styles.count, { color: isSelected ? '#fff' : colors.textTertiary }]}>{tradeCount}</Text>
-            )}
+              numberOfLines={1}
+            >
+              {tradeCount}
+            </Text>
           </View>
         )}
       </View>
@@ -68,27 +114,28 @@ export const CalendarDayCell: React.FC<CalendarDayCellProps> = ({
 const styles = StyleSheet.create({
   touchable: {
     width: '14.28%',
-    aspectRatio: 0.92,
+    aspectRatio: 0.82,
     padding: 2,
   },
   inner: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 2,
   },
-  indicatorRow: {
-    flexDirection: 'row',
+  dayText: {
+    ...fontBase,
+    fontSize: 12.5,
+  },
+  returnWrap: {
+    marginTop: 2,
     alignItems: 'center',
-    marginTop: 3,
+    justifyContent: 'center',
+    paddingHorizontal: 2,
   },
-  dot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-  },
-  count: {
-    fontSize: 8,
-    marginLeft: 2,
-    fontWeight: '600',
+  returnText: {
+    ...fontBase,
+    fontSize: 9.5,
+    fontWeight: '800',
   },
 });

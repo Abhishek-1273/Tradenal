@@ -1,6 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { VictoryPie } from 'victory-native';
+import { View, Text, StyleSheet, Platform } from 'react-native';
+import Svg, { Circle, G } from 'react-native-svg';
 import { useTheme } from '../../theme';
 
 interface WinLossPieProps {
@@ -9,86 +9,103 @@ interface WinLossPieProps {
   showLegend?: boolean;
 }
 
+const fontBase = {
+  fontFamily: Platform.select({ ios: 'System', android: 'sans-serif' }),
+  includeFontPadding: false,
+};
+
 export const WinLossPie: React.FC<WinLossPieProps> = ({
   data,
-  size = 140,
-  showLegend = true,
+  size = 110,
 }) => {
-  const { colors, typography, spacing } = useTheme();
+  const { colors, isDark } = useTheme();
 
-  const total = data.reduce((sum, d) => sum + d.value, 0);
+  const wins = data?.find((d) => d.label.toLowerCase().includes('win'))?.value ?? 0;
+  const losses = data?.find((d) => d.label.toLowerCase().includes('loss'))?.value ?? 0;
+  const total = wins + losses;
 
-  if (total === 0) {
-    return (
-      <View style={[styles.empty, { width: size, height: size }]}>
-        <Text style={[typography.caption, { color: colors.textTertiary }]}>No data</Text>
-      </View>
-    );
-  }
+  const radius = (size - 18) / 2;
+  const circumference = 2 * Math.PI * radius;
 
-  const chartData = data.map((d) => ({
-    x: d.label,
-    y: d.value,
-    color: d.color,
-  }));
+  const winPercent = total > 0 ? wins / total : 0;
+  const winStrokeLength = winPercent * circumference;
+  const gap = total > 0 && wins > 0 && losses > 0 ? 6 : 0;
 
   return (
-    <View style={styles.row}>
+    <View style={styles.container}>
+      {/* Donut Chart */}
       <View style={[styles.chartWrap, { width: size, height: size }]}>
-        <VictoryPie
-          data={chartData}
-          width={size}
-          height={size}
-          padding={8}
-          innerRadius={size * 0.28}
-          colorScale={data.map((d) => d.color)}
-          labels={() => null}
-          style={{
-            data: {
-              stroke: colors.background,
-              strokeWidth: 2,
-            },
-          }}
-        />
-        {/* Center label */}
-        <View style={styles.centerLabel}>
-          <Text style={[typography.numericSm, { color: colors.textPrimary }]}>
-            {total}
-          </Text>
-          <Text style={[typography.caption, { color: colors.textTertiary }]}>
-            Trades
-          </Text>
+        <Svg width={size} height={size}>
+          <G rotation="-90" origin={`${size / 2}, ${size / 2}`}>
+            {total === 0 ? (
+              <Circle
+                cx={size / 2}
+                cy={size / 2}
+                r={radius}
+                stroke={isDark ? 'rgba(255,255,255,0.1)' : '#E2E8F0'}
+                strokeWidth="9"
+                fill="none"
+              />
+            ) : (
+              <>
+                {/* Background / Loss Track */}
+                <Circle
+                  cx={size / 2}
+                  cy={size / 2}
+                  r={radius}
+                  stroke="#EF4444"
+                  strokeWidth="9"
+                  fill="none"
+                  strokeDasharray={`${circumference - winStrokeLength - gap} ${circumference}`}
+                  strokeDashoffset={-winStrokeLength - gap / 2}
+                  strokeLinecap="round"
+                />
+                {/* Win Arc */}
+                {wins > 0 && (
+                  <Circle
+                    cx={size / 2}
+                    cy={size / 2}
+                    r={radius}
+                    stroke="#10B981"
+                    strokeWidth="9"
+                    fill="none"
+                    strokeDasharray={`${winStrokeLength - gap} ${circumference}`}
+                    strokeDashoffset={-gap / 2}
+                    strokeLinecap="round"
+                  />
+                )}
+              </>
+            )}
+          </G>
+        </Svg>
+
+        {/* Center Text */}
+        <View style={styles.centerText}>
+          <Text style={[styles.totalNumber, { color: colors.textPrimary }]}>{total}</Text>
+          <Text style={[styles.totalLabel, { color: colors.textTertiary }]}>Trades</Text>
         </View>
       </View>
 
-      {showLegend && (
-        <View style={[styles.legend, { marginLeft: spacing[4] }]}>
-          {data.map((item) => {
-            const pct = ((item.value / total) * 100).toFixed(0);
-            return (
-              <View key={item.label} style={[styles.legendItem, { marginBottom: spacing[2] }]}>
-                <View style={[styles.legendDot, { backgroundColor: item.color }]} />
-                <View>
-                  <Text style={[typography.label, { color: colors.textPrimary }]}>
-                    {item.value}{' '}
-                    <Text style={{ color: colors.textTertiary }}>({pct}%)</Text>
-                  </Text>
-                  <Text style={[typography.caption, { color: colors.textTertiary }]}>
-                    {item.label}
-                  </Text>
-                </View>
-              </View>
-            );
-          })}
+      {/* Breakdown Rows */}
+      <View style={styles.legendContainer}>
+        <View style={styles.legendRow}>
+          <View style={[styles.dot, { backgroundColor: '#10B981' }]} />
+          <Text style={[styles.legendLabel, { color: colors.textSecondary }]}>Wins</Text>
+          <Text style={[styles.legendValue, { color: colors.textPrimary }]}>{wins}</Text>
         </View>
-      )}
+
+        <View style={[styles.legendRow, { marginTop: 6 }]}>
+          <View style={[styles.dot, { backgroundColor: '#EF4444' }]} />
+          <Text style={[styles.legendLabel, { color: colors.textSecondary }]}>Losses</Text>
+          <Text style={[styles.legendValue, { color: colors.textPrimary }]}>{losses}</Text>
+        </View>
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
+  container: {
     alignItems: 'center',
   },
   chartWrap: {
@@ -96,27 +113,47 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  centerLabel: {
+  centerText: {
     position: 'absolute',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  legend: {
-    flex: 1,
-    justifyContent: 'center',
+  totalNumber: {
+    ...fontBase,
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: -0.5,
   },
-  legendItem: {
+  totalLabel: {
+    ...fontBase,
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: -1,
+  },
+  legendContainer: {
+    width: '100%',
+    marginTop: 14,
+    paddingHorizontal: 4,
+  },
+  legendRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  legendDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+  dot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
     marginRight: 8,
   },
-  empty: {
-    alignItems: 'center',
-    justifyContent: 'center',
+  legendLabel: {
+    ...fontBase,
+    fontSize: 12,
+    fontWeight: '500',
+    flex: 1,
+  },
+  legendValue: {
+    ...fontBase,
+    fontSize: 12,
+    fontWeight: '700',
   },
 });

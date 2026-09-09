@@ -12,24 +12,22 @@ interface EmotionCardProps {
 }
 
 const getEmotionColors = (label: string, colors: any) => {
-  const successLabels = ['Calm', 'Confident', 'Confident & Held', 'Satisfied', 'Proud', 'Happy'];
-  const warningLabels = ['Excited', 'Doubtful', 'Tempted Add', 'Impatient', 'Neutral', 'Relieved', 'Greedy'];
+  const lower = label.toLowerCase();
   
-  const cleanLabel = label.trim();
-  if (successLabels.includes(cleanLabel)) {
+  if (lower.includes('calm') || lower.includes('confident') || lower.includes('disciplined')) {
     return {
-      bg: colors.success + '15',
+      bg: colors.success + '18',
       border: colors.success,
     };
   }
-  if (warningLabels.includes(cleanLabel)) {
+  if (lower.includes('neutral') || lower.includes('relieved') || lower.includes('bored') || lower.includes('hesitant') || lower.includes('doubtful')) {
     return {
-      bg: colors.warning + '15',
+      bg: colors.warning + '18',
       border: colors.warning,
     };
   }
   return {
-    bg: colors.error + '15',
+    bg: colors.error + '18',
     border: colors.error,
   };
 };
@@ -62,15 +60,30 @@ export const EmotionCard: React.FC<EmotionCardProps> = ({ label, icon, selected,
             backgroundColor: activeBg,
             borderColor: activeBorder,
             borderWidth: selected ? 1.5 : 1,
-            borderRadius: radii.lg,
-            paddingVertical: spacing[3],
+            borderRadius: radii.md,
+            paddingVertical: spacing[2],
+            paddingHorizontal: 2,
+            minHeight: 62,
+            justifyContent: 'center',
           },
         ]}
       >
-        <Ionicons name={icon} size={21} color={activeColor} />
+        <Ionicons name={icon} size={19} color={activeColor} />
         <Text
           numberOfLines={1}
-          style={[typography.labelSm, { color: activeTextColor, marginTop: 6 }]}
+          adjustsFontSizeToFit={true}
+          minimumFontScale={0.78}
+          style={[
+            typography.labelSm,
+            {
+              color: activeTextColor,
+              marginTop: 4,
+              fontSize: 10,
+              lineHeight: 14,
+              textAlign: 'center',
+              width: '100%',
+            },
+          ]}
         >
           {label}
         </Text>

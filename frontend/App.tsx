@@ -19,8 +19,8 @@ const queryClient = new QueryClient({
         if (error?.response?.status >= 400 && error?.response?.status < 500) return false;
         return failureCount < 2;
       },
-      staleTime: 2 * 60 * 1000,
-      gcTime: 10 * 60 * 1000,
+      staleTime: 5 * 60 * 1000, // 5 minutes cache — instant 0ms tab transitions
+      gcTime: 30 * 60 * 1000,  // 30 minutes garbage collection
       refetchOnWindowFocus: false,
       refetchOnReconnect: true,
     },
@@ -44,8 +44,8 @@ const ThemedApp: React.FC = () => {
           <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
             <StatusBar
               barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-              backgroundColor={theme.colors.background}
-              translucent={false}
+              backgroundColor="transparent"
+              translucent={true}
             />
             <OfflineBanner />
             <AppNavigatorRoot />

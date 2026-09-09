@@ -58,7 +58,7 @@ export const DateField: React.FC<DateFieldProps> = ({
           },
         ]}
       >
-        <Ionicons name="calendar-outline" size={18} color={colors.primary} />
+        <Ionicons name="calendar-outline" size={18} color={colors.textPrimary} />
         <Text
           style={[
             typography.body,

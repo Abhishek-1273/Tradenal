@@ -16,24 +16,10 @@ export type TradeSetup =
   | 'liquiditySweepReversal'
   | 'custom';
 export type TradeResult = 'win' | 'loss' | 'breakeven' | 'partialWin';
-export type EmotionBefore = 'confident' | 'fear' | 'greedy' | 'fomo' | 'calm' | 'excited' | 'bored' | 'tired' | 'distracted';
-export type EmotionAfter = 'happy' | 'frustrated' | 'angry' | 'satisfied' | 'neutral' | 'regretful' | 'proud' | 'relieved' | 'disappointed';
-export type EmotionDuring = 'calm' | 'anxious' | 'doubtful' | 'tempted_to_close' | 'tempted_to_move_sl' | 'confident_held' | 'tempted_to_add' | 'impatient' | 'panicky';
-export type TradeMistake =
-  | 'enteredEarly'
-  | 'lateEntry'
-  | 'noConfirmation'
-  | 'ignoredTrend'
-  | 'riskTooHigh'
-  | 'poorRR'
-  | 'noSL'
-  | 'closedEarly'
-  | 'heldTooLong'
-  | 'modifiedOrderRepeatedly'
-  | 'chasedPrice'
-  | 'noHigherTFCheck'
-  | 'stackedTooManyConfluences'
-  | 'custom';
+export type EmotionBefore = string;
+export type EmotionAfter = string;
+export type EmotionDuring = string;
+export type TradeMistake = string;
 
 export interface IScreenshot {
   url: string;
@@ -70,7 +56,9 @@ export interface ITrade extends Document {
 
   // Classification
   session: TradeSession;
-  setup?: TradeSetup;
+  strategy?: string;
+  setup?: string;
+  confluences?: string[];
   customSetup?: string;
   result: TradeResult;
 
@@ -90,6 +78,7 @@ export interface ITrade extends Document {
   sizedCorrectly: boolean;
   withinDailyLossLimit: boolean;
   singleTradeDominance: boolean;
+  checklist: string[];
   mistakes: TradeMistake[];
   customMistake?: string;
 
@@ -97,6 +86,9 @@ export interface ITrade extends Document {
   screenshots: IScreenshot[];
   reasonForEntry?: string;
   notes?: string;
+  keyTakeaway?: string;
+  whatWentWell?: string;
+  whatToImprove?: string;
 
   // Tags
   tags: string[];
@@ -194,11 +186,13 @@ const TradeSchema = new Schema<ITrade>(
       required: [true, 'Session is required'],
       index: true,
     },
+    strategy: { type: String, maxlength: 100, index: true },
     setup: {
       type: String,
-      enum: ['breakout', 'liquiditySweep', 'smc', 'ict', 'supportResistance', 'trendFollowing', 'scalp', 'swing', 'orderBlock', 'fairValueGap', 'liquiditySweepReversal', 'custom'],
+      maxlength: 100,
       index: true,
     },
+    confluences: { type: [String], default: [] },
     customSetup: { type: String, maxlength: 100 },
 
     result: {
@@ -210,15 +204,15 @@ const TradeSchema = new Schema<ITrade>(
 
     emotionBefore: {
       type: String,
-      enum: ['confident', 'fear', 'greedy', 'fomo', 'calm', 'excited', 'bored', 'tired', 'distracted'],
+      maxlength: 100,
     },
     emotionDuring: {
       type: String,
-      enum: ['calm', 'anxious', 'doubtful', 'tempted_to_close', 'tempted_to_move_sl', 'confident_held', 'tempted_to_add', 'impatient', 'panicky'],
+      maxlength: 100,
     },
     emotionAfter: {
       type: String,
-      enum: ['happy', 'frustrated', 'angry', 'satisfied', 'neutral', 'regretful', 'proud', 'relieved', 'disappointed'],
+      maxlength: 100,
     },
     confluenceCount: { type: Number, default: 0, min: 0, max: 20 },
     followedPlan: { type: Boolean, default: true },
@@ -232,9 +226,9 @@ const TradeSchema = new Schema<ITrade>(
     sizedCorrectly: { type: Boolean, default: true },
     withinDailyLossLimit: { type: Boolean, default: true },
     singleTradeDominance: { type: Boolean, default: true },
+    checklist: { type: [String], default: [] },
     mistakes: {
       type: [String],
-      enum: ['enteredEarly', 'lateEntry', 'noConfirmation', 'ignoredTrend', 'riskTooHigh', 'poorRR', 'noSL', 'closedEarly', 'heldTooLong', 'modifiedOrderRepeatedly', 'chasedPrice', 'noHigherTFCheck', 'stackedTooManyConfluences', 'custom'],
       default: [],
     },
     customMistake: { type: String, maxlength: 200 },
@@ -242,6 +236,9 @@ const TradeSchema = new Schema<ITrade>(
     screenshots: { type: [ScreenshotSchema], default: [] },
     reasonForEntry: { type: String, maxlength: 1000 },
     notes: { type: String, maxlength: 5000 },
+    keyTakeaway: { type: String, maxlength: 2000 },
+    whatWentWell: { type: String, maxlength: 2000 },
+    whatToImprove: { type: String, maxlength: 2000 },
 
     tags: { type: [String], default: [], index: true },
     isFavorite: { type: Boolean, default: false },

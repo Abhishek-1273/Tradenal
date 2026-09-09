@@ -1,5 +1,11 @@
 import mongoose, { Document, Schema, Model } from 'mongoose';
 
+export interface IRuleAudit {
+  rule: string;
+  status: 'Followed' | 'Violated' | 'Not Tested';
+  verdict: string;
+}
+
 export interface IReviewContent {
   summary: string;
   biggestMistakes: string[];
@@ -11,6 +17,7 @@ export interface IReviewContent {
   psychologyInsights: string;
   riskManagementFeedback: string;
   strengthsToKeep: string[];
+  ruleAdherence?: IRuleAudit[];
 }
 
 export interface IReview extends Document {
@@ -50,6 +57,16 @@ const ReviewContentSchema = new Schema<IReviewContent>(
     psychologyInsights: { type: String },
     riskManagementFeedback: { type: String },
     strengthsToKeep: { type: [String], default: [] },
+    ruleAdherence: {
+      type: [
+        {
+          rule: { type: String, required: true },
+          status: { type: String, enum: ['Followed', 'Violated', 'Not Tested'], default: 'Followed' },
+          verdict: { type: String, required: true },
+        },
+      ],
+      default: [],
+    },
   },
   { _id: false }
 );
