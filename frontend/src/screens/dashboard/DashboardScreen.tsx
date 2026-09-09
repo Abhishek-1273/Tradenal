@@ -294,7 +294,7 @@ export const DashboardScreen: React.FC = () => {
           })}
         </View>
 
-        {isLoading ? (
+        {isLoading && !data ? (
           <DashboardSkeleton />
         ) : (
           <>

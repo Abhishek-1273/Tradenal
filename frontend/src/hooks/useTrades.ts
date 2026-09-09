@@ -1,10 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { tradesApi } from '../api/trades.api';
 import { statsApi, aiApi } from '../api/stats.api';
 import { patternsApi } from '../api/stats.api';
 import { useUIStore } from '../store/ui.store';
 import { useAccountStore } from '../store/account.store';
 import { CreateTradePayload, TradeFilters } from '../types';
+
+export const dashboardCache: Record<string, any> = {};
 
 // ─── Query Keys ───────────────────────────────────────────────────────────────
 export const tradeKeys = {
@@ -126,10 +129,21 @@ export const useDashboard = () => {
   const dashboardPeriod = useUIStore((s) => s.dashboardPeriod);
   const activeAccount = useAccountStore((s) => s.activeAccount);
   const accountId = activeAccount?._id;
+  const cacheKey = `dash_${dashboardPeriod}_${accountId || 'default'}`;
+
   return useQuery({
     queryKey: statsKeys.dashboard(dashboardPeriod, accountId),
-    queryFn: () => statsApi.getDashboard(dashboardPeriod, accountId),
-    staleTime: 2 * 60 * 1000,
+    queryFn: async () => {
+      const result = await statsApi.getDashboard(dashboardPeriod, accountId);
+      if (result) {
+        dashboardCache[cacheKey] = result;
+        AsyncStorage.setItem(`tj_${cacheKey}`, JSON.stringify(result)).catch(() => {});
+      }
+      return result;
+    },
+    initialData: () => dashboardCache[cacheKey],
+    placeholderData: (previousData) => previousData,
+    staleTime: 5 * 60 * 1000,
   });
 };
 

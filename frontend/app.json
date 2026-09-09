@@ -3,7 +3,7 @@
     "name": "Tradenal",
     "slug": "tradenal",
     "scheme": "tradenal",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -19,17 +19,18 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.tradenal.app",
-      "buildNumber": "2"
+      "buildNumber": "3"
     },
     "android": {
+      "icon": "./assets/icon.png",
       "backgroundColor": "#070B14",
       "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#070B14"
       },
-      "package": "com.tradenal.app",
-      "versionCode": 2,
+      "package": "com.tradenal.journal",
+      "versionCode": 3,
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",

@@ -5,6 +5,8 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { PaperProvider } from 'react-native-paper';
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { dashboardCache } from './src/hooks/useTrades';
 import { ThemeContext, createTheme, getPaperTheme } from './src/theme';
 import { useUIStore } from './src/store/ui.store';
 import { AppNavigatorRoot } from './src/navigation/AppNavigator';
@@ -35,6 +37,20 @@ const ThemedApp: React.FC = () => {
 
   useEffect(() => {
     initTheme();
+    AsyncStorage.getAllKeys().then((keys) => {
+      const dashKeys = keys.filter((k) => k.startsWith('tj_dash_'));
+      if (dashKeys.length > 0) {
+        AsyncStorage.multiGet(dashKeys).then((entries) => {
+          entries.forEach(([key, val]) => {
+            if (val) {
+              try {
+                dashboardCache[key.replace('tj_', '')] = JSON.parse(val);
+              } catch {}
+            }
+          });
+        }).catch(() => {});
+      }
+    }).catch(() => {});
   }, []);
 
   return (
