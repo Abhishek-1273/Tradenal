@@ -51,15 +51,20 @@ export const calculateRiskCapAudit = (
   const pnlNum = parseFloat(pnlAmountStr || '');
   const realizedPnL = !isNaN(pnlNum) ? pnlNum : undefined;
 
+  // Realistic market spread & execution slippage buffer (5% tolerance or min 3 units)
+  const slippageTolerance = Math.max(3, maxOnePercentRisk * 0.05);
+  const maxAllowedLoss = maxOnePercentRisk + slippageTolerance;
+
   let isViolated = false;
   let violationReason = '';
 
-  if (plannedRiskPercent > 1.0) {
+  // Allow up to 1.05% planned risk to prevent rounding false-positives
+  if (plannedRiskPercent > 1.05) {
     isViolated = true;
     violationReason = `Planned risk (${plannedRiskPercent.toFixed(1)}%) breaches the ≤ 1% starting balance cap (${currencySymbol}${maxOnePercentRisk.toFixed(0)} max).`;
-  } else if (realizedPnL !== undefined && realizedPnL < -maxOnePercentRisk) {
+  } else if (realizedPnL !== undefined && realizedPnL < -maxAllowedLoss) {
     isViolated = true;
-    violationReason = `Realized loss (${currencySymbol}${Math.abs(realizedPnL).toFixed(2)}) exceeds your ≤ 1% starting balance limit (${currencySymbol}${maxOnePercentRisk.toFixed(0)}).`;
+    violationReason = `Realized loss (${currencySymbol}${Math.abs(realizedPnL).toFixed(2)}) significantly exceeds your ≤ 1% limit (${currencySymbol}${maxOnePercentRisk.toFixed(0)} + ${currencySymbol}${slippageTolerance.toFixed(0)} slippage buffer).`;
   }
 
   const statusLabel = isViolated ? 'Risk Cap Violated' : 'Within ≤ 1% Risk Cap';

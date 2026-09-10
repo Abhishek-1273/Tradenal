@@ -40,7 +40,7 @@ export const Input = forwardRef<TextInput, InputProps>(
     },
     ref
   ) => {
-    const { colors, radii, typography, spacing } = useTheme();
+    const { colors, radii, typography, spacing, isDark } = useTheme();
     const [isFocused, setIsFocused] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
 
@@ -99,7 +99,8 @@ export const Input = forwardRef<TextInput, InputProps>(
               setIsFocused(false);
               onBlur?.(e);
             }}
-            selectionColor={colors.primary}
+            selectionColor={isDark ? 'rgba(99, 102, 241, 0.45)' : 'rgba(99, 102, 241, 0.28)'}
+            cursorColor={isDark ? '#818CF8' : '#6366F1'}
             {...rest}
           />
 

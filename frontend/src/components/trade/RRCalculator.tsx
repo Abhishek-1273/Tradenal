@@ -173,33 +173,47 @@ export const RRCalculator: React.FC<RRCalculatorProps> = ({
           marginTop: spacing[2.5],
         }}
       >
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, flex: 1 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1, marginRight: 8 }}>
           <Ionicons
             name={riskAudit.isViolated ? 'alert-circle' : 'shield-checkmark'}
-            size={13}
+            size={14}
             color={riskAudit.isViolated ? '#EF4444' : '#10B981'}
           />
           <Text
+            numberOfLines={1}
             style={{
               fontSize: 11,
               fontWeight: '600',
               color: riskAudit.isViolated ? '#EF4444' : colors.textSecondary,
+              flex: 1,
             }}
           >
             {riskAudit.isViolated
               ? `Exceeds ≤ 1% Cap (${riskAudit.currencySymbol}${riskAudit.maxOnePercentRisk.toFixed(0)} Max)`
-              : `Within ≤ 1% Risk Cap (${riskAudit.currencySymbol}${riskAudit.maxOnePercentRisk.toFixed(0)} on ${riskAudit.currencySymbol}${riskAudit.accountBalance.toLocaleString()} starting balance)`}
+              : `≤ 1% Risk Cap: Max ${riskAudit.currencySymbol}${riskAudit.maxOnePercentRisk.toFixed(0)} (${riskAudit.currencySymbol}${riskAudit.accountBalance.toLocaleString()} acc)`}
           </Text>
         </View>
-        <Text
+        <View
           style={{
-            fontSize: 10.5,
-            fontWeight: '700',
-            color: riskAudit.isViolated ? '#EF4444' : '#10B981',
+            paddingHorizontal: 8,
+            paddingVertical: 2.5,
+            borderRadius: 6,
+            backgroundColor: riskAudit.isViolated ? 'rgba(239, 68, 68, 0.16)' : 'rgba(16, 185, 129, 0.16)',
+            borderColor: riskAudit.isViolated ? 'rgba(239, 68, 68, 0.3)' : 'rgba(16, 185, 129, 0.3)',
+            borderWidth: 0.5,
           }}
         >
-          {riskAudit.isViolated ? 'CAP BREACH' : 'COMPLIANT'}
-        </Text>
+          <Text
+            style={{
+              fontSize: 10,
+              fontWeight: '800',
+              color: riskAudit.isViolated ? '#EF4444' : '#10B981',
+              letterSpacing: 0.3,
+            }}
+          >
+            {riskAudit.isViolated ? 'BREACH' : 'COMPLIANT'}
+          </Text>
+        </View>
       </View>
 
       {/* Proportional Risk / Reward Visual Bar */}
