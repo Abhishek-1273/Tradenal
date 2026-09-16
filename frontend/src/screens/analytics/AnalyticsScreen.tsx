@@ -403,7 +403,7 @@ export const AnalyticsScreen: React.FC = () => {
                   { color: pf >= 1.25 ? WIN_COLOR : pf >= 1.0 ? '#F59E0B' : LOSS_COLOR },
                 ]}
               >
-                {pf.toFixed(2)}
+                {typeof pf === 'number' ? pf.toFixed(2) : '0.00'}
               </Text>
               <Text style={[styles.metricSub, { color: colors.textTertiary }]}>
                 {pf >= 1.0 ? 'Positive Edge' : 'Negative Edge'}
@@ -525,8 +525,8 @@ export const AnalyticsScreen: React.FC = () => {
                       <Text style={[styles.compBoxTitle, { color: '#10B981' }]} numberOfLines={1}>Plan Followed</Text>
                     </View>
                     <Text style={[styles.compReturnVal, { color: '#10B981' }]}>
-                      {data.psychologyComparisons.planFollowed.netRR >= 0 ? '+' : ''}
-                      {data.psychologyComparisons.planFollowed.netRR.toFixed(1)}R
+                      {(data.psychologyComparisons.planFollowed.netRR ?? 0) >= 0 ? '+' : ''}
+                      {(data.psychologyComparisons.planFollowed.netRR ?? 0).toFixed(1)}R
                     </Text>
                     {data.psychologyComparisons.planFollowed.netPnL !== 0 && (
                       <Text
@@ -567,8 +567,8 @@ export const AnalyticsScreen: React.FC = () => {
                       <Text style={[styles.compBoxTitle, { color: '#EF4444' }]} numberOfLines={1}>Plan Broken</Text>
                     </View>
                     <Text style={[styles.compReturnVal, { color: '#EF4444' }]}>
-                      {data.psychologyComparisons.planBroken.netRR >= 0 ? '+' : ''}
-                      {data.psychologyComparisons.planBroken.netRR.toFixed(1)}R
+                      {(data.psychologyComparisons.planBroken.netRR ?? 0) >= 0 ? '+' : ''}
+                      {(data.psychologyComparisons.planBroken.netRR ?? 0).toFixed(1)}R
                     </Text>
                     {data.psychologyComparisons.planBroken.netPnL !== 0 && (
                       <Text
@@ -657,7 +657,7 @@ export const AnalyticsScreen: React.FC = () => {
                     ? `${getSessionLabel(bestSessionObj.session).toUpperCase()} • ${bestSessionObj.winRate}% WIN`
                     : 'MARKET HOURS',
                   text: bestSessionObj
-                    ? `Your highest edge is in the ${getSessionLabel(bestSessionObj.session)} session (${bestSessionObj.winRate}% win rate, ${bestSessionObj.netRR >= 0 ? '+' : ''}${bestSessionObj.netRR.toFixed(1)}R over ${bestSessionObj.totalTrades} trades). Concentrate your core risk here.`
+                    ? `Your highest edge is in the ${getSessionLabel(bestSessionObj.session)} session (${bestSessionObj.winRate}% win rate, ${(bestSessionObj.netRR ?? 0) >= 0 ? '+' : ''}${(bestSessionObj.netRR ?? 0).toFixed(1)}R over ${bestSessionObj.totalTrades} trades). Concentrate your core risk here.`
                     : 'Tag your session (New York, London, Asian) when logging trades to discover which trading window yields your highest edge.',
                 },
                 {
@@ -668,7 +668,7 @@ export const AnalyticsScreen: React.FC = () => {
                     ? `${getSetupLabel(bestSetupObj.setup).toUpperCase()} • ${bestSetupObj.winRate}% WIN`
                     : 'CORE PLAYBOOK',
                   text: bestSetupObj
-                    ? `"${getSetupLabel(bestSetupObj.setup)}" is your most profitable setup (${bestSetupObj.winRate}% win rate, ${bestSetupObj.netRR >= 0 ? '+' : ''}${bestSetupObj.netRR.toFixed(1)}R). Focus on executing A+ quality of this model and eliminate untested setups.`
+                    ? `"${getSetupLabel(bestSetupObj.setup)}" is your most profitable setup (${bestSetupObj.winRate}% win rate, ${(bestSetupObj.netRR ?? 0) >= 0 ? '+' : ''}${(bestSetupObj.netRR ?? 0).toFixed(1)}R). Focus on executing A+ quality of this model and eliminate untested setups.`
                     : 'Tag setups like Breakout, Order Block, or FVG when entering trades to pinpoint your highest-expectancy playbook.',
                 },
                 {
@@ -766,7 +766,7 @@ export const AnalyticsScreen: React.FC = () => {
 
                       <View style={{ alignItems: 'flex-end' }}>
                         <Text style={[styles.breakdownReturn, { color: isPos ? WIN_COLOR : LOSS_COLOR }]}>
-                          {isPos ? '+' : ''}{s.netRR.toFixed(1)}R
+                          {isPos ? '+' : ''}{(s.netRR ?? 0).toFixed(1)}R
                         </Text>
                         <Text style={[styles.breakdownPnL, { color: colors.textTertiary }]}>
                           {s.winRate}% Win Rate
@@ -836,8 +836,8 @@ export const AnalyticsScreen: React.FC = () => {
                         <Text style={[styles.breakdownReturn, { color: isPos ? WIN_COLOR : LOSS_COLOR }]}>
                           {formatPnL(p.netPnL ?? 0, currency)}
                         </Text>
-                        <Text style={[styles.breakdownPnL, { color: p.netRR >= 0 ? WIN_COLOR : LOSS_COLOR }]}>
-                          {p.netRR >= 0 ? '+' : ''}{p.netRR.toFixed(1)}R return
+                        <Text style={[styles.breakdownPnL, { color: (p.netRR ?? 0) >= 0 ? WIN_COLOR : LOSS_COLOR }]}>
+                          {(p.netRR ?? 0) >= 0 ? '+' : ''}{(p.netRR ?? 0).toFixed(1)}R return
                         </Text>
                       </View>
                     </View>
@@ -907,7 +907,7 @@ export const AnalyticsScreen: React.FC = () => {
 
                       <View style={{ alignItems: 'flex-end' }}>
                         <Text style={[styles.breakdownReturn, { color: isPos ? WIN_COLOR : LOSS_COLOR }]}>
-                          {isPos ? '+' : ''}{sess.netRR.toFixed(1)}R
+                          {isPos ? '+' : ''}{(sess.netRR ?? 0).toFixed(1)}R
                         </Text>
                         <Text style={[styles.breakdownPnL, { color: colors.textTertiary }]}>
                           {sess.winRate}% Win Rate

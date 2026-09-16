@@ -350,7 +350,7 @@ export const TradeDetailScreen: React.FC = () => {
                 >
                   <Text style={[styles.heroRLabel, { color: colors.textTertiary }]}>R:</Text>
                   <Text style={[styles.heroRValue, { color: resultColor }]}>
-                    {effectiveR >= 0 ? '+' : ''}{effectiveR.toFixed(2)}R
+                    {(effectiveR ?? 0) >= 0 ? '+' : ''}{(effectiveR ?? 0).toFixed(2)}R
                   </Text>
                 </View>
               </View>
@@ -498,7 +498,7 @@ export const TradeDetailScreen: React.FC = () => {
                     <Text style={[styles.metricLabel, { color: colors.textTertiary }]}>RISK : REWARD</Text>
                   </View>
                   <Text style={[styles.metricValue, { color: colors.textPrimary }]}>
-                    {trade.riskReward ? `1 : ${trade.riskReward.toFixed(2)}` : '—'}
+                    {typeof trade.riskReward === 'number' ? `1 : ${trade.riskReward.toFixed(2)}` : '—'}
                   </Text>
                 </View>
 
@@ -521,7 +521,7 @@ export const TradeDetailScreen: React.FC = () => {
                     <Text style={[styles.metricLabel, { color: colors.textTertiary }]}>LOT SIZE</Text>
                   </View>
                   <Text style={[styles.metricValue, { color: colors.textPrimary }]}>
-                    {trade.lotSize ? `${trade.lotSize.toFixed(2)} Lots` : '—'}
+                    {typeof trade.lotSize === 'number' ? `${trade.lotSize.toFixed(2)} Lots` : '—'}
                   </Text>
                 </View>
 

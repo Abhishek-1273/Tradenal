@@ -266,7 +266,7 @@ export const CalendarScreen: React.FC = () => {
                   ]}
                 >
                   {monthStats.hasTrades
-                    ? `${monthStats.netRR >= 0 ? '+' : ''}${monthStats.netRR.toFixed(1)}R`
+                    ? `${(monthStats.netRR ?? 0) >= 0 ? '+' : ''}${(monthStats.netRR ?? 0).toFixed(1)}R`
                     : '0.0R'}
                 </Text>
                 {monthStats.hasTrades && monthStats.netPnL !== 0 && (
@@ -477,7 +477,7 @@ export const CalendarScreen: React.FC = () => {
               </Text>
               <Text style={[styles.selectedDaySub, { color: colors.textTertiary }]}>
                 {selectedHasTrades
-                  ? `${selectedDayTrades.length} Trade${selectedDayTrades.length > 1 ? 's' : ''} • ${selectedNetRR >= 0 ? '+' : ''}${selectedNetRR.toFixed(1)}R return`
+                  ? `${selectedDayTrades.length} Trade${selectedDayTrades.length > 1 ? 's' : ''} • ${(selectedNetRR ?? 0) >= 0 ? '+' : ''}${(selectedNetRR ?? 0).toFixed(1)}R return`
                   : 'No trade executions logged on this day'}
               </Text>
             </View>
