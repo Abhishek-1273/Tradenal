@@ -5,7 +5,7 @@ import { Platform, NativeModules } from 'react-native';
 
 // ── Backend URL config ───────────────────────────────────────────────────
 const PROD_API_URL = 'https://tradenal.onrender.com/api';
-const DEFAULT_LOCAL_IP = '192.168.1.100';
+const DEFAULT_LOCAL_IP = '192.168.1.105';
 const LOCAL_PORT = 5000;
 
 const getDevApiUrl = (): string => {
