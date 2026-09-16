@@ -22,8 +22,7 @@ const getDevApiUrl = (): string => {
 };
 
 export const BASE_URL =
-  process.env.EXPO_PUBLIC_API_URL ||
-  (typeof __DEV__ !== 'undefined' && __DEV__ ? getDevApiUrl() : PROD_API_URL);
+  process.env.EXPO_PUBLIC_API_URL || PROD_API_URL;
 
 let isRefreshing = false;
 let failedQueue: Array<{
