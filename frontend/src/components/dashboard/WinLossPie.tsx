@@ -49,17 +49,19 @@ export const WinLossPie: React.FC<WinLossPieProps> = ({
             ) : (
               <>
                 {/* Background / Loss Track */}
-                <Circle
-                  cx={size / 2}
-                  cy={size / 2}
-                  r={radius}
-                  stroke="#EF4444"
-                  strokeWidth="9"
-                  fill="none"
-                  strokeDasharray={`${circumference - winStrokeLength - gap} ${circumference}`}
-                  strokeDashoffset={-winStrokeLength - gap / 2}
-                  strokeLinecap="round"
-                />
+                {losses > 0 && (
+                  <Circle
+                    cx={size / 2}
+                    cy={size / 2}
+                    r={radius}
+                    stroke="#EF4444"
+                    strokeWidth="9"
+                    fill="none"
+                    strokeDasharray={`${Math.max(0, circumference - winStrokeLength - gap)} ${circumference}`}
+                    strokeDashoffset={-winStrokeLength - gap / 2}
+                    strokeLinecap="round"
+                  />
+                )}
                 {/* Win Arc */}
                 {wins > 0 && (
                   <Circle
@@ -69,7 +71,7 @@ export const WinLossPie: React.FC<WinLossPieProps> = ({
                     stroke="#10B981"
                     strokeWidth="9"
                     fill="none"
-                    strokeDasharray={`${winStrokeLength - gap} ${circumference}`}
+                    strokeDasharray={`${Math.max(0, winStrokeLength - gap)} ${circumference}`}
                     strokeDashoffset={-gap / 2}
                     strokeLinecap="round"
                   />
