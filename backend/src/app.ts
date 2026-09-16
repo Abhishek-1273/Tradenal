@@ -22,6 +22,9 @@ const app: Application = express();
 // Trust proxy for reverse proxies (Render, Cloudflare, etc.) to prevent rate limit warnings
 app.set('trust proxy', 1);
 
+// Disable etag for REST APIs so mobile okhttp clients don't receive 304 empty bodies
+app.set('etag', false);
+
 // ─── Security Headers ─────────────────────────────────────────────────────────
 app.use(helmet());
 

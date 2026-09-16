@@ -97,12 +97,16 @@ export const EquityCurve: React.FC<EquityCurveProps> = ({
   // Parse points or fallback to flat zero baseline
   const rawPoints = useMemo(() => {
     if (hasData) {
-      const mapped = chartData.map((d, i) => ({
-        val: d.cumulativePnL !== undefined ? d.cumulativePnL : d.cumulativeRR * 100,
-        date: d.date,
-        idx: i,
-        tradeNumber: d.tradeNumber,
-      }));
+      const mapped = chartData.map((d, i) => {
+        const rawVal = d.cumulativePnL !== undefined ? d.cumulativePnL : (d.cumulativeRR !== undefined ? d.cumulativeRR * 100 : 0);
+        const val = typeof rawVal === 'number' && Number.isFinite(rawVal) ? rawVal : 0;
+        return {
+          val,
+          date: d.date,
+          idx: i,
+          tradeNumber: d.tradeNumber,
+        };
+      });
 
       // Prepend a zero-origin starting point for smooth visualization
       if (mapped.length === 1) {

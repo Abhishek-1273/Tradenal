@@ -146,14 +146,20 @@ export const DashboardScreen: React.FC = () => {
   // Group trades on same calendar day for Sparkline when viewing month/week
   const sparklineData = React.useMemo(() => {
     const rawCurve: EquityCurvePoint[] = data?.equityCurve ?? [];
+    const getVal = (p: EquityCurvePoint): number => {
+      if (typeof p.cumulativePnL === 'number' && Number.isFinite(p.cumulativePnL)) return p.cumulativePnL;
+      if (typeof p.cumulativeRR === 'number' && Number.isFinite(p.cumulativeRR)) return p.cumulativeRR * 100;
+      return 0;
+    };
+
     if (rawCurve.length <= 1 || dashboardPeriod === 'today') {
-      return rawCurve.map((p: EquityCurvePoint) => p.cumulativePnL ?? p.cumulativeRR * 100);
+      return rawCurve.map(getVal);
     }
 
     const byDate = new Map<string, number>();
     rawCurve.forEach((p: EquityCurvePoint) => {
-      const dStr = p.date ? dayjs(p.date).format('YYYY-MM-DD') : p.date;
-      byDate.set(dStr, p.cumulativePnL ?? p.cumulativeRR * 100);
+      const dStr = p.date ? dayjs(p.date).format('YYYY-MM-DD') : (p.tradeNumber ? `T${p.tradeNumber}` : '0');
+      byDate.set(dStr, getVal(p));
     });
 
     return Array.from(byDate.values());

@@ -20,6 +20,8 @@ interface AuthState {
   clearError: () => void;
 }
 
+let isInitializing = false;
+
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   isAuthenticated: false,
@@ -29,6 +31,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   // ─── Initialize: restore session from storage (Instant Optimistic) ─────────
   initialize: async () => {
+    if (get().isInitialized || isInitializing) return;
+    isInitializing = true;
     try {
       const [accessToken, user] = await Promise.all([
         storage.getAccessToken(),
@@ -58,6 +62,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
     } catch (error) {
       set({ user: null, isAuthenticated: false, error: null, isInitialized: true });
+    } finally {
+      isInitializing = false;
     }
   },
 

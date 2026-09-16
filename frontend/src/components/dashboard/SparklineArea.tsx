@@ -57,8 +57,13 @@ export const SparklineArea: React.FC<SparklineAreaProps> = ({
   const chartWidth = Math.max(width - paddingX * 2, 50);
   const chartHeight = Math.max(height - paddingTop - paddingBottom, 30);
 
-  // If isEmpty is explicitly true, or data has 0 length
-  const isZeroState = isEmpty || !data || data.length === 0 || data.every((d) => d === 0);
+  // Filter out any non-finite numbers (NaN, null, undefined)
+  const validData = Array.isArray(data)
+    ? data.filter((d) => typeof d === 'number' && Number.isFinite(d))
+    : [];
+
+  // If isEmpty is explicitly true, or validData has 0 length
+  const isZeroState = isEmpty || validData.length === 0 || validData.every((d) => d === 0);
 
   if (isZeroState) {
     const flatY = paddingTop + chartHeight * 0.65;
@@ -113,16 +118,16 @@ export const SparklineArea: React.FC<SparklineAreaProps> = ({
     );
   }
 
-  const values = data.length >= 2 ? data : [0, data[0] || 0];
+  const values = validData.length >= 2 ? validData : [0, validData[0] || 0];
 
   const min = Math.min(...values);
   const max = Math.max(...values);
   const range = max - min || 1;
 
   const points = values.map((val, idx) => {
-    const x = paddingX + (idx / (values.length - 1)) * chartWidth;
+    const x = paddingX + (idx / Math.max(values.length - 1, 1)) * chartWidth;
     const y = paddingTop + chartHeight - ((val - min) / range) * chartHeight;
-    return { x, y };
+    return { x: Number.isFinite(x) ? x : paddingX, y: Number.isFinite(y) ? y : paddingTop };
   });
 
   const linePath = createSmoothPath(points);
