@@ -5,9 +5,9 @@ import { statsApi, aiApi } from '../api/stats.api';
 import { patternsApi } from '../api/stats.api';
 import { useUIStore } from '../store/ui.store';
 import { useAccountStore } from '../store/account.store';
-import { CreateTradePayload, TradeFilters } from '../types';
+import { CreateTradePayload, TradeFilters, DashboardData } from '../types';
 
-export const dashboardCache: Record<string, any> = {};
+export const dashboardCache: Record<string, DashboardData> = {};
 
 // ─── Query Keys ───────────────────────────────────────────────────────────────
 export const tradeKeys = {
@@ -131,7 +131,7 @@ export const useDashboard = () => {
   const accountId = activeAccount?._id;
   const cacheKey = `dash_${dashboardPeriod}_${accountId || 'default'}`;
 
-  return useQuery({
+  return useQuery<DashboardData>({
     queryKey: statsKeys.dashboard(dashboardPeriod, accountId),
     queryFn: async () => {
       const result = await statsApi.getDashboard(dashboardPeriod, accountId);

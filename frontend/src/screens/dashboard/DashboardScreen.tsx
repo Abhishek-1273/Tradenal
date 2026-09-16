@@ -27,6 +27,7 @@ import { Skeleton } from '../../components/common/LoadingOverlay';
 import { AppNavProp } from '../../navigation/types';
 import { formatDuration } from '../../utils/formatters';
 import { useAccountStore } from '../../store/account.store';
+import { EquityCurvePoint } from '../../types';
 
 type Period = 'today' | 'week' | 'month' | 'all';
 const PERIODS: { label: string; value: Period }[] = [
@@ -144,13 +145,13 @@ export const DashboardScreen: React.FC = () => {
 
   // Group trades on same calendar day for Sparkline when viewing month/week
   const sparklineData = React.useMemo(() => {
-    const rawCurve = data?.equityCurve ?? [];
+    const rawCurve: EquityCurvePoint[] = data?.equityCurve ?? [];
     if (rawCurve.length <= 1 || dashboardPeriod === 'today') {
-      return rawCurve.map((p) => p.cumulativePnL ?? p.cumulativeRR * 100);
+      return rawCurve.map((p: EquityCurvePoint) => p.cumulativePnL ?? p.cumulativeRR * 100);
     }
 
     const byDate = new Map<string, number>();
-    rawCurve.forEach((p) => {
+    rawCurve.forEach((p: EquityCurvePoint) => {
       const dStr = p.date ? dayjs(p.date).format('YYYY-MM-DD') : p.date;
       byDate.set(dStr, p.cumulativePnL ?? p.cumulativeRR * 100);
     });
@@ -264,16 +265,16 @@ export const DashboardScreen: React.FC = () => {
                   styles.periodCapsule,
                   active
                     ? {
-                        backgroundColor: isDark ? '#FFFFFF' : '#0F172A',
-                        shadowColor: '#000',
-                        shadowOffset: { width: 0, height: 2 },
-                        shadowOpacity: 0.15,
-                        shadowRadius: 3,
-                        elevation: 2,
-                      }
+                      backgroundColor: isDark ? '#FFFFFF' : '#0F172A',
+                      shadowColor: '#000',
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: 0.15,
+                      shadowRadius: 3,
+                      elevation: 2,
+                    }
                     : {
-                        backgroundColor: 'transparent',
-                      },
+                      backgroundColor: 'transparent',
+                    },
                 ]}
               >
                 <Text
@@ -330,13 +331,13 @@ export const DashboardScreen: React.FC = () => {
                       backgroundColor: !hasTrades
                         ? (isDark ? 'rgba(148, 163, 184, 0.15)' : '#F1F5F9')
                         : isProfit
-                        ? (isDark ? 'rgba(16, 185, 129, 0.18)' : '#E6F8F0')
-                        : (isDark ? 'rgba(239, 68, 68, 0.18)' : '#FEF2F2'),
+                          ? (isDark ? 'rgba(16, 185, 129, 0.18)' : '#E6F8F0')
+                          : (isDark ? 'rgba(239, 68, 68, 0.18)' : '#FEF2F2'),
                       borderColor: !hasTrades
                         ? (isDark ? 'rgba(148, 163, 184, 0.25)' : '#CBD5E1')
                         : isProfit
-                        ? (isDark ? 'rgba(16, 185, 129, 0.3)' : '#A7F3D0')
-                        : (isDark ? 'rgba(239, 68, 68, 0.3)' : '#FECACA'),
+                          ? (isDark ? 'rgba(16, 185, 129, 0.3)' : '#A7F3D0')
+                          : (isDark ? 'rgba(239, 68, 68, 0.3)' : '#FECACA'),
                     },
                   ]}
                 >
@@ -371,8 +372,8 @@ export const DashboardScreen: React.FC = () => {
                       backgroundColor: !hasTrades
                         ? (isDark ? 'rgba(148, 163, 184, 0.15)' : '#F1F5F9')
                         : isProfit
-                        ? (isDark ? 'rgba(16, 185, 129, 0.15)' : '#DCFCE7')
-                        : (isDark ? 'rgba(239, 68, 68, 0.15)' : '#FEE2E2'),
+                          ? (isDark ? 'rgba(16, 185, 129, 0.15)' : '#DCFCE7')
+                          : (isDark ? 'rgba(239, 68, 68, 0.15)' : '#FEE2E2'),
                     },
                   ]}
                 >
@@ -453,8 +454,8 @@ export const DashboardScreen: React.FC = () => {
                         backgroundColor: !hasTrades
                           ? (isDark ? 'rgba(148, 163, 184, 0.15)' : '#F1F5F9')
                           : isProfit
-                          ? (isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5')
-                          : (isDark ? 'rgba(239, 68, 68, 0.15)' : '#FEF2F2'),
+                            ? (isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5')
+                            : (isDark ? 'rgba(239, 68, 68, 0.15)' : '#FEF2F2'),
                       },
                     ]}
                   >
@@ -503,8 +504,8 @@ export const DashboardScreen: React.FC = () => {
                         backgroundColor: !hasTrades
                           ? (isDark ? 'rgba(148, 163, 184, 0.15)' : '#F1F5F9')
                           : (stats?.profitFactor ?? 0) >= 1.0
-                          ? (isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5')
-                          : (isDark ? 'rgba(239, 68, 68, 0.15)' : '#FEF2F2'),
+                            ? (isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5')
+                            : (isDark ? 'rgba(239, 68, 68, 0.15)' : '#FEF2F2'),
                       },
                     ]}
                   >
@@ -515,8 +516,8 @@ export const DashboardScreen: React.FC = () => {
                         !hasTrades
                           ? (isDark ? '#94A3B8' : '#64748B')
                           : (stats?.profitFactor ?? 0) >= 1.0
-                          ? '#10B981'
-                          : '#EF4444'
+                            ? '#10B981'
+                            : '#EF4444'
                       }
                     />
                   </View>
@@ -529,8 +530,8 @@ export const DashboardScreen: React.FC = () => {
                       color: !hasTrades
                         ? colors.textPrimary
                         : (stats?.profitFactor ?? 0) >= 1.0
-                        ? '#10B981'
-                        : '#EF4444',
+                          ? '#10B981'
+                          : '#EF4444',
                     },
                   ]}
                 >
@@ -543,8 +544,8 @@ export const DashboardScreen: React.FC = () => {
                       color: !hasTrades
                         ? colors.textTertiary
                         : (stats?.profitFactor ?? 0) >= 1.0
-                        ? '#10B981'
-                        : colors.textTertiary,
+                          ? '#10B981'
+                          : colors.textTertiary,
                     },
                   ]}
                 >
@@ -627,8 +628,8 @@ export const DashboardScreen: React.FC = () => {
                       color: !hasTrades
                         ? colors.textPrimary
                         : (stats?.netRR ?? 0) >= 0
-                        ? '#10B981'
-                        : '#EF4444',
+                          ? '#10B981'
+                          : '#EF4444',
                     },
                   ]}
                 >
@@ -782,8 +783,8 @@ export const DashboardScreen: React.FC = () => {
                         color: !hasTrades
                           ? colors.textPrimary
                           : (stats?.expectancy ?? 0) >= 0
-                          ? '#10B981'
-                          : '#EF4444',
+                            ? '#10B981'
+                            : '#EF4444',
                       }}
                     >
                       {expectancyRR}
@@ -805,8 +806,8 @@ export const DashboardScreen: React.FC = () => {
                     backgroundColor: !hasTrades
                       ? isDark ? 'rgba(255,255,255,0.06)' : '#E2E8F0'
                       : (stats?.expectancy ?? 0) >= 0
-                      ? 'rgba(16, 185, 129, 0.12)'
-                      : 'rgba(239, 68, 68, 0.12)',
+                        ? 'rgba(16, 185, 129, 0.12)'
+                        : 'rgba(239, 68, 68, 0.12)',
                   }}
                 >
                   <Text
@@ -816,8 +817,8 @@ export const DashboardScreen: React.FC = () => {
                       color: !hasTrades
                         ? colors.textTertiary
                         : (stats?.expectancy ?? 0) >= 0
-                        ? '#10B981'
-                        : '#EF4444',
+                          ? '#10B981'
+                          : '#EF4444',
                     }}
                   >
                     {!hasTrades ? 'NO EDGE' : (stats?.expectancy ?? 0) >= 0 ? 'POSITIVE EDGE' : 'NEGATIVE EDGE'}
