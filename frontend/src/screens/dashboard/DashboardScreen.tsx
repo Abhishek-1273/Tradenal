@@ -113,33 +113,33 @@ export const DashboardScreen: React.FC = () => {
   const depositDisplay = `$${deposit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const currency = activeAccount?.currency ?? 'USD';
 
-  const winRate = hasTrades ? Math.round(stats?.winRate ?? 0) : 0;
-  const expectancyDisplay = hasTrades
-    ? `${(stats?.expectancyAmount ?? 0) >= 0 ? '+' : '-'}$${Math.abs(stats?.expectancyAmount ?? 0).toFixed(2)}`
+  const winRate = hasTrades && typeof stats?.winRate === 'number' ? Math.round(stats.winRate) : 0;
+  const expectancyDisplay = hasTrades && typeof stats?.expectancyAmount === 'number'
+    ? `${stats.expectancyAmount >= 0 ? '+' : '-'}$${Math.abs(stats.expectancyAmount).toFixed(2)}`
     : '$0.00';
-  const expectancyRR = hasTrades
-    ? `${(stats?.expectancy ?? 0) >= 0 ? '+' : ''}${(stats?.expectancy ?? 0).toFixed(2)}R`
+  const expectancyRR = hasTrades && typeof stats?.expectancy === 'number'
+    ? `${stats.expectancy >= 0 ? '+' : ''}${stats.expectancy.toFixed(2)}R`
     : '0.00R';
 
-  const profitFactorDisplay = hasTrades && stats?.profitFactor !== undefined
+  const profitFactorDisplay = hasTrades && typeof stats?.profitFactor === 'number'
     ? stats.profitFactor.toFixed(2)
     : '0.00';
-  const avgWinDisplay = hasTrades && stats?.avgWin !== undefined
+  const avgWinDisplay = hasTrades && typeof stats?.avgWin === 'number'
     ? `+${stats.avgWin.toFixed(2)}R`
     : '+0.00R';
-  const avgLossDisplay = hasTrades && stats?.avgLoss !== undefined
+  const avgLossDisplay = hasTrades && typeof stats?.avgLoss === 'number'
     ? `-${Math.abs(stats.avgLoss).toFixed(2)}R`
     : '-0.00R';
-  const avgHoldDisplay = hasTrades && stats?.avgHoldingTime
+  const avgHoldDisplay = hasTrades && typeof stats?.avgHoldingTime === 'number'
     ? formatDuration(stats.avgHoldingTime)
     : '0m';
 
-  const streak = hasTrades ? Math.abs(stats?.currentStreak ?? 0) : 0;
+  const streak = hasTrades && typeof stats?.currentStreak === 'number' ? Math.abs(stats.currentStreak) : 0;
   const isWinStreak = (stats?.currentStreakType ?? 'win') === 'win';
-  const avgRRDisplay = hasTrades && stats?.avgRR !== undefined
+  const avgRRDisplay = hasTrades && typeof stats?.avgRR === 'number'
     ? `${stats.avgRR.toFixed(2)}R`
     : '0.00R';
-  const netRRDisplay = hasTrades && stats?.netRR !== undefined
+  const netRRDisplay = hasTrades && typeof stats?.netRR === 'number'
     ? `${stats.netRR >= 0 ? '+' : ''}${stats.netRR.toFixed(2)}R`
     : '0.00R';
 

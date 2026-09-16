@@ -47,10 +47,10 @@ export const CalendarDayScreen: React.FC = () => {
             <View style={[styles.summaryCard, { backgroundColor: colors.surface, borderRadius: radii.xl, borderWidth: 1, borderColor: netRR >= 0 ? colors.success + '40' : colors.error + '40', padding: spacing[4], marginBottom: spacing[4] }]}>
               <View style={styles.summaryRow}>
                 {[
-                  { label: 'Net R', value: `${netRR >= 0 ? '+' : ''}${netRR.toFixed(2)}R`, color: netRR >= 0 ? colors.success : colors.error },
-                  { label: 'Win Rate', value: formatPercent(stats.winRate), color: colors.primary },
-                  { label: 'Trades', value: stats.totalTrades.toString() },
-                  { label: 'Avg RR', value: `${stats.avgRR.toFixed(2)}R` },
+                  { label: 'Net R', value: `${(netRR ?? 0) >= 0 ? '+' : ''}${(netRR ?? 0).toFixed(2)}R`, color: (netRR ?? 0) >= 0 ? colors.success : colors.error },
+                  { label: 'Win Rate', value: formatPercent(stats?.winRate ?? 0), color: colors.primary },
+                  { label: 'Trades', value: (stats?.totalTrades ?? 0).toString() },
+                  { label: 'Avg RR', value: `${(stats?.avgRR ?? 0).toFixed(2)}R` },
                 ].map((m) => (
                   <View key={m.label} style={{ flex: 1, alignItems: 'center' }}>
                     <Text style={[typography.numericSm, { color: m.color ?? colors.textPrimary }]}>{m.value}</Text>

@@ -212,7 +212,7 @@ export const TradeCard: React.FC<TradeCardProps> = React.memo(({
               numberOfLines={1}
               adjustsFontSizeToFit
             >
-              {trade.entryPrice.toFixed(trade.entryPrice < 10 ? 5 : 2)}
+              {typeof trade.entryPrice === 'number' ? trade.entryPrice.toFixed(trade.entryPrice < 10 ? 5 : 2) : '—'}
             </Text>
           </View>
 
@@ -223,7 +223,7 @@ export const TradeCard: React.FC<TradeCardProps> = React.memo(({
               numberOfLines={1}
               adjustsFontSizeToFit
             >
-              {trade.exitPrice ? trade.exitPrice.toFixed(trade.exitPrice < 10 ? 5 : 2) : '—'}
+              {typeof trade.exitPrice === 'number' ? trade.exitPrice.toFixed(trade.exitPrice < 10 ? 5 : 2) : '—'}
             </Text>
           </View>
 
