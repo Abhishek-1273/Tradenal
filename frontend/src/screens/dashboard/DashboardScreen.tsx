@@ -8,7 +8,7 @@ import {
   RefreshControl,
   Platform,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import dayjs from 'dayjs';
@@ -86,18 +86,23 @@ export const DashboardScreen: React.FC = () => {
 
   const { data, isLoading, refetch, isRefetching } = useDashboard();
 
+  // Auto-refresh fresh data whenever screen gains focus (e.g. after adding/editing trade)
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
+
   const handleAddTrade = useCallback(() => navigation.navigate('AddTrade'), [navigation]);
 
   const stats = data?.stats;
-  const deposit = activeAccount?.startingBalance && activeAccount.startingBalance > 0
-    ? activeAccount.startingBalance
-    : 5000;
+  const deposit = activeAccount?.startingBalance ?? (activeAccount?.currentBalance ?? 0);
 
   const currentPeriodObj = PERIODS.find((p) => p.value === dashboardPeriod);
   const currentPeriodLabel = currentPeriodObj ? currentPeriodObj.label : 'This Month';
 
   // Real detection of trades in the selected period (Today, This Week, This Month, All Time)
-  const hasTrades = (stats?.totalTrades ?? 0) > 0;
+  const hasTrades = Boolean(activeAccount && typeof stats?.totalTrades === 'number' && stats.totalTrades > 0);
   const totalTrades = hasTrades ? (stats?.totalTrades ?? 0) : 0;
   const pnl = hasTrades ? (stats?.netPnL ?? 0) : 0;
   const isProfit = pnl >= 0;
@@ -108,7 +113,7 @@ export const DashboardScreen: React.FC = () => {
     ? `${pnlSign}$${absPnl.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
     : '$0.00';
   const pnlPctDisplay = hasTrades ? `${pnlSign}${pnlPct.toFixed(1)}%` : '0.0%';
-  const currentBalance = activeAccount?.currentBalance ?? (deposit + pnl);
+  const currentBalance = activeAccount ? (activeAccount.currentBalance ?? (deposit + pnl)) : 0;
   const balanceDisplay = `$${currentBalance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const depositDisplay = `$${deposit.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const currency = activeAccount?.currency ?? 'USD';

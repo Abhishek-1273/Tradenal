@@ -113,6 +113,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await storage.clearAll();
       const { useAccountStore } = require('./account.store');
       useAccountStore.getState().clearAccountState();
+      try {
+        const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+        const allKeys = await AsyncStorage.getAllKeys();
+        const toRemove = allKeys.filter((k: string) => k.startsWith('tj_') && !k.includes('theme'));
+        if (toRemove.length > 0) {
+          await AsyncStorage.multiRemove(toRemove);
+        }
+      } catch {}
       set({ user: null, isAuthenticated: false, isLoading: false, error: null });
     }
   },

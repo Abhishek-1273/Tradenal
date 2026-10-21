@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   RefreshControl,
   Platform,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -43,6 +44,12 @@ export const AnalyticsScreen: React.FC = () => {
   const { colors, spacing, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const { data, isLoading, refetch, isRefetching } = useAnalytics();
+
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
   const { activeAccount } = useAccountStore();
   const [activeTab, setActiveTab] = useState<Tab>('overview');
 

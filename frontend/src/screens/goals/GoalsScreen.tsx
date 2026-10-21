@@ -53,148 +53,173 @@ const RULE_CATEGORY_META: Record<DailyRule['category'], { icon: keyof typeof Ion
 };
 
 const PRESET_RULES: Omit<DailyRule, 'id' | 'createdAt'>[] = [
+  // ── 01 / SETUP QUALITY ──
   {
-    title: 'Strict "Max 2 Trades"',
-    description: 'Max 2 trades per day. Close terminal once limit is reached.',
-    category: 'risk',
-    icon: 'ban-outline',
-    color: '#EF4444',
-    isActive: true,
-  },
-  {
-    title: 'Max 1% Daily Risk',
-    description: 'Strict 1% daily risk cap. Pre-calculate lot size before entry.',
-    category: 'risk',
-    icon: 'wallet-outline',
-    color: '#F97316',
-    isActive: true,
-  },
-  {
-    title: 'Minimum 1:2 to 1:3 RR',
-    description: 'Minimum 1:2 or 1:3 room required. Trail winners, no panic exits.',
-    category: 'setup',
-    icon: 'scale-outline',
-    color: '#10B981',
-    isActive: true,
-  },
-  {
-    title: 'No Chasing (Limit Orders First)',
-    description: 'Never chase running price. Let price come to your level or miss the move.',
-    category: 'setup',
-    icon: 'locate-outline',
-    color: '#8B5CF6',
-    isActive: true,
-  },
-  {
-    title: 'High-Impact News Quarantine',
-    description: 'No execution during CPI, NFP, or major news. Let spikes & slippage settle.',
-    category: 'timing',
-    icon: 'flash-outline',
-    color: '#F59E0B',
-    isActive: true,
-  },
-  {
-    title: '"Cash Is A Position"',
-    description: 'Zero-trade days are disciplined decisions, not failures. Wait for clean setups.',
-    category: 'psychology',
-    icon: 'cash-outline',
-    color: '#06B6D4',
-    isActive: true,
-  },
-  {
-    title: 'A+ Confluence Filter Only',
-    description: 'Trade only when HTF Trend Bias + Liquidity Sweep + Key POI align together.',
+    title: 'RULE 01 / A+ Setup Filter',
+    description: 'Take entries only on 15M or 1H strong market levels.',
     category: 'setup',
     icon: 'filter-outline',
-    color: '#6366F1',
+    color: '#3B82F6',
     isActive: true,
   },
   {
-    title: 'Price Action Over Indicators',
-    description: 'Indicators are just scanners. Execute purely on candle reactions & sweeps.',
-    category: 'setup',
-    icon: 'eye-outline',
-    color: '#14B8A6',
-    isActive: true,
-  },
-  {
-    title: 'Trade London & NY Sessions Only',
-    description: 'New trade entries allowed only during London (12–3:30 PM) & NY (5:30–9 PM IST). No closing/holding time limit.',
-    category: 'timing',
-    icon: 'time-outline',
-    color: '#D97706',
-    isActive: true,
-  },
-  {
-    title: 'Multi-Timeframe Hierarchy (4H→1H→15M)',
-    description: 'Top-down flow: 4H trend bias → 1H swing structure → 15M/5M sweep confirmation.',
+    title: 'RULE 02 / Allowed Patterns',
+    description: 'Only trade QML, ISS4, TJL2, and clean DT/DB with strict level confirmation.',
     category: 'setup',
     icon: 'layers-outline',
     color: '#8B5CF6',
     isActive: true,
   },
   {
-    title: 'Breakeven Protection (SL to BE)',
-    description: 'Move SL to entry at 1:1 or key swing break. Protect capital first.',
+    title: 'RULE 03 / Mandatory Confirmation',
+    description: 'No entry without confirmation—either an engulfing candle or higher timeframe (1H/5M) CHOCH.',
+    category: 'setup',
+    icon: 'shield-checkmark-outline',
+    color: '#10B981',
+    isActive: true,
+  },
+
+  // ── 02 / RISK & EXECUTION ──
+  {
+    title: 'RULE 04 / Risk Cap',
+    description: 'Strictly risk a maximum of 1% per day (calculated lot to fit structural SL).',
+    category: 'risk',
+    icon: 'wallet-outline',
+    color: '#EF4444',
+    isActive: true,
+  },
+  {
+    title: 'RULE 05 / Daily Trade Limit',
+    description: 'Maximum 2 trades per day, zero over-trading.',
+    category: 'risk',
+    icon: 'ban-outline',
+    color: '#F97316',
+    isActive: true,
+  },
+  {
+    title: 'RULE 06 / Risk-to-Reward Ratio',
+    description: 'Always target 1:2 or 1:3.',
+    category: 'risk',
+    icon: 'scale-outline',
+    color: '#10B981',
+    isActive: true,
+  },
+  {
+    title: 'RULE 07 / Breakeven Rule',
+    description: 'Shift SL to entry (Risk-Free) once the trade reaches 1:1.5.',
     category: 'risk',
     icon: 'lock-closed-outline',
     color: '#059669',
     isActive: true,
   },
   {
-    title: 'No Widening Stop-Loss',
-    description: 'Never move SL further away. Accept the invalidation, protect drawdown.',
+    title: 'RULE 08 / Partial Profit Rule',
+    description: 'Book 40-50% partial profit when trade hits 1:2.',
     category: 'risk',
-    icon: 'close-circle-outline',
+    icon: 'pie-chart-outline',
+    color: '#06B6D4',
+    isActive: true,
+  },
+  {
+    title: 'RULE 09 / No Mid-Trade Scaling',
+    description: 'Once an order is placed, never modify lot size or interfere mid-trade.',
+    category: 'risk',
+    icon: 'hand-left-outline',
     color: '#DC2626',
     isActive: true,
   },
+
+  // ── 03 / STOP-LOSS & POSITION SIZE ──
   {
-    title: 'Set & Forget (No Screen Staring)',
-    description: 'Set SL/TP and walk away. Stop watching tick-by-tick P&L on your phone.',
-    category: 'psychology',
-    icon: 'eye-off-outline',
-    color: '#64748B',
-    isActive: true,
-  },
-  {
-    title: 'Mandatory Trade Journaling',
-    description: 'Log entry/exit charts, setup rationale, and emotions for every trade.',
-    category: 'custom',
-    icon: 'journal-outline',
-    color: '#3B82F6',
-    isActive: true,
-  },
-  {
-    title: 'No Revenge Trading',
-    description: 'Take mandatory 30-min break after any loss before considering next trade.',
-    category: 'psychology',
-    icon: 'pause-circle-outline',
-    color: '#EF4444',
-    isActive: true,
-  },
-  {
-    title: 'Stop on 2 Consecutive Losses',
-    description: 'Close terminal for the day after 2 consecutive stop-losses.',
+    title: 'RULE 10 / Wide Structural SL',
+    description: 'Always keep SL outside market structure, minimum 12-15 points away on Gold.',
     category: 'risk',
-    icon: 'hand-left-outline',
+    icon: 'shield-outline',
     color: '#E11D48',
     isActive: true,
   },
   {
-    title: 'Weekend Market Prep & Review',
-    description: 'Review weekly trade statistics and mark key HTF levels before Monday.',
-    category: 'custom',
-    icon: 'calendar-outline',
-    color: '#0284C7',
+    title: 'RULE 11 / Lot-Size Adjustment',
+    description: 'Never shrink SL unnaturally; if SL is wide, lower lot size to 0.01 to match risk.',
+    category: 'risk',
+    icon: 'calculator-outline',
+    color: '#D97706',
     isActive: true,
   },
   {
-    title: 'Emotion-Free Position Sizing',
-    description: 'If position size makes your heart race, lot size is too big. Reduce sizing.',
+    title: 'RULE 12 / Mandatory SL',
+    description: 'Stop-Loss is compulsory on every single trade.',
+    category: 'risk',
+    icon: 'shield-half-outline',
+    color: '#EF4444',
+    isActive: true,
+  },
+
+  // ── 04 / FOCUS, TIMING & NEWS ──
+  {
+    title: 'RULE 13 / Single-Pair Focus',
+    description: 'Focus strictly on Gold (XAUUSD); do not look at other pairs unless Gold has no level.',
+    category: 'timing',
+    icon: 'locate-outline',
+    color: '#F59E0B',
+    isActive: true,
+  },
+  {
+    title: 'RULE 14 / Session Control',
+    description: 'No out-of-session trading—trade only during London and New York sessions.',
+    category: 'timing',
+    icon: 'time-outline',
+    color: '#3B82F6',
+    isActive: true,
+  },
+  {
+    title: 'RULE 15 / News Defense',
+    description: 'Stay out of the market during high-impact macroeconomic news; exit or partial-book before news time.',
+    category: 'timing',
+    icon: 'flash-outline',
+    color: '#DC2626',
+    isActive: true,
+  },
+  {
+    title: 'RULE 16 / Zero Noise',
+    description: 'No background YouTube live-streams, public signal channels, or external commentary during trading.',
+    category: 'timing',
+    icon: 'volume-mute-outline',
+    color: '#64748B',
+    isActive: true,
+  },
+
+  // ── 05 / PSYCHOLOGY & DISCIPLINE ──
+  {
+    title: 'RULE 17 / Take Profit Reality',
+    description: 'Take partials/profits when large moves occur; do not greedily wait for final targets blindly.',
     category: 'psychology',
-    icon: 'heart-outline',
-    color: '#EC4899',
+    icon: 'trending-up-outline',
+    color: '#10B981',
+    isActive: true,
+  },
+  {
+    title: 'RULE 18 / No Hope Trading',
+    description: 'Cut small losses instantly without ego if price action turns choppy or unfavorable right after entry.',
+    category: 'psychology',
+    icon: 'close-circle-outline',
+    color: '#EF4444',
+    isActive: true,
+  },
+  {
+    title: 'RULE 19 / Cooldown Break',
+    description: 'Take a mandatory 30–45 minute break if the first trade hits SL; no immediate revenge trades.',
+    category: 'psychology',
+    icon: 'pause-circle-outline',
+    color: '#8B5CF6',
+    isActive: true,
+  },
+  {
+    title: 'RULE 20 / No Revenge / Aar-Paar Mode',
+    description: 'Never enter all-or-nothing (aar-paar) or double-lot revenge modes under account pressure.',
+    category: 'psychology',
+    icon: 'flame-outline',
+    color: '#B91C1C',
     isActive: true,
   },
 ];
@@ -228,8 +253,8 @@ export const GoalsScreen: React.FC = () => {
       if (stored) {
         setRules(JSON.parse(stored));
       } else {
-        // Initial setup: seed top 5 institutional rules (active by default)
-        const defaultSeeded: DailyRule[] = PRESET_RULES.slice(0, 5).map((p, idx) => ({
+        // Initial setup: seed all 20 Master Playbook rules (active by default)
+        const defaultSeeded: DailyRule[] = PRESET_RULES.map((p, idx) => ({
           ...p,
           id: (Date.now() + idx).toString(),
           isActive: true,
@@ -325,6 +350,31 @@ export const GoalsScreen: React.FC = () => {
     setRules(updated);
     saveRules(updated);
     showToast('Rule added', 'success');
+  };
+
+  const handleLoadMasterPlaybook = () => {
+    Alert.alert(
+      'Load Master Playbook',
+      'This will load all 20 Strict Rules from the Master Trading Playbook (XAUUSD / Prop Firm Challenges). Continue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Load All 20 Rules',
+          onPress: () => {
+            const playbookRules: DailyRule[] = PRESET_RULES.map((preset, idx) => ({
+              ...preset,
+              id: (Date.now() + idx).toString(),
+              isActive: true,
+              createdAt: new Date().toISOString(),
+            }));
+            setRules(playbookRules);
+            saveRules(playbookRules);
+            setShowPresetsModal(false);
+            showToast('20 Master Playbook rules loaded', 'success');
+          },
+        },
+      ]
+    );
   };
 
   // Targets calculations queries
@@ -1172,8 +1222,29 @@ export const GoalsScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
           <Text style={[typography.body, { color: colors.textTertiary, paddingHorizontal: spacing[5], marginBottom: spacing[3] }]}>
-            Tap '+' to add a preset rule to your daily checklist.
+            Master Trading Playbook (XAUUSD / Prop Firm Challenges):
           </Text>
+          <TouchableOpacity
+            onPress={handleLoadMasterPlaybook}
+            activeOpacity={0.8}
+            style={{
+              marginHorizontal: spacing[5],
+              marginBottom: spacing[3],
+              backgroundColor: '#8B5CF6',
+              paddingVertical: 12,
+              paddingHorizontal: 16,
+              borderRadius: radii.md,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+            }}
+          >
+            <Ionicons name="book-outline" size={18} color="#FFFFFF" />
+            <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 }}>
+              Load Full Playbook (All 20 Rules)
+            </Text>
+          </TouchableOpacity>
           <ScrollView contentContainerStyle={{ paddingHorizontal: spacing[5] }}>
             {PRESET_RULES.map((preset, idx) => {
               const meta = RULE_CATEGORY_META[preset.category];

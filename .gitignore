@@ -42,5 +42,7 @@ lerna-debug.log*
 ._*
 .Spotlight-V100
 .Trashes
-ehthumbs.db
-Thumbs.db
+# Temporary and archive files
+*.zip
+*.tar.gz
+*.rar

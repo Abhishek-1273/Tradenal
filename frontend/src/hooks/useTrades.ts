@@ -35,6 +35,12 @@ export const reviewKeys = {
   latest: (type: string) => [...reviewKeys.all, 'latest', type] as const,
 };
 
+export const clearDashboardCache = () => {
+  for (const k in dashboardCache) {
+    delete dashboardCache[k];
+  }
+};
+
 // ─── Trade Hooks ──────────────────────────────────────────────────────────────
 export const useTrades = (filters: TradeFilters = {}) => {
   const { activeAccount } = useAccountStore();
@@ -42,7 +48,7 @@ export const useTrades = (filters: TradeFilters = {}) => {
   return useQuery({
     queryKey: tradeKeys.list({ ...filters, accountId }, accountId),
     queryFn: () => tradesApi.getTrades({ ...filters, accountId }),
-    staleTime: 1 * 60 * 1000,
+    staleTime: 0,
   });
 };
 
@@ -51,6 +57,7 @@ export const useTrade = (id: string) => {
     queryKey: tradeKeys.detail(id),
     queryFn: () => tradesApi.getTradeById(id),
     enabled: !!id,
+    staleTime: 0,
   });
 };
 
@@ -60,10 +67,15 @@ export const useCreateTrade = () => {
   return useMutation({
     mutationFn: (data: CreateTradePayload) =>
       tradesApi.createTrade({ ...data, accountId: data.accountId || activeAccount?._id }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: tradeKeys.all });
-      queryClient.invalidateQueries({ queryKey: statsKeys.all });
-      useAccountStore.getState().fetchAccounts();
+    onSuccess: async () => {
+      clearDashboardCache();
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: tradeKeys.all }),
+        queryClient.invalidateQueries({ queryKey: statsKeys.all }),
+        queryClient.refetchQueries({ queryKey: tradeKeys.all, type: 'active' }),
+        queryClient.refetchQueries({ queryKey: statsKeys.all, type: 'active' }),
+        useAccountStore.getState().fetchAccounts(),
+      ]);
     },
   });
 };
@@ -72,11 +84,16 @@ export const useUpdateTrade = (id: string) => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (data: Partial<CreateTradePayload>) => tradesApi.updateTrade(id, data),
-    onSuccess: (updated) => {
+    onSuccess: async (updated) => {
+      clearDashboardCache();
       queryClient.setQueryData(tradeKeys.detail(id), updated);
-      queryClient.invalidateQueries({ queryKey: tradeKeys.all });
-      queryClient.invalidateQueries({ queryKey: statsKeys.all });
-      useAccountStore.getState().fetchAccounts();
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: tradeKeys.all }),
+        queryClient.invalidateQueries({ queryKey: statsKeys.all }),
+        queryClient.refetchQueries({ queryKey: tradeKeys.all, type: 'active' }),
+        queryClient.refetchQueries({ queryKey: statsKeys.all, type: 'active' }),
+        useAccountStore.getState().fetchAccounts(),
+      ]);
     },
   });
 };
@@ -85,10 +102,15 @@ export const useDeleteTrade = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => tradesApi.deleteTrade(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: tradeKeys.all });
-      queryClient.invalidateQueries({ queryKey: statsKeys.all });
-      useAccountStore.getState().fetchAccounts();
+    onSuccess: async () => {
+      clearDashboardCache();
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: tradeKeys.all }),
+        queryClient.invalidateQueries({ queryKey: statsKeys.all }),
+        queryClient.refetchQueries({ queryKey: tradeKeys.all, type: 'active' }),
+        queryClient.refetchQueries({ queryKey: statsKeys.all, type: 'active' }),
+        useAccountStore.getState().fetchAccounts(),
+      ]);
     },
   });
 };
@@ -110,7 +132,7 @@ export const useTags = () => {
   return useQuery({
     queryKey: tradeKeys.tags(accountId),
     queryFn: () => tradesApi.getTags(accountId),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 60 * 1000,
   });
 };
 
@@ -120,7 +142,7 @@ export const usePairs = () => {
   return useQuery({
     queryKey: tradeKeys.pairs(accountId),
     queryFn: () => tradesApi.getPairs(accountId),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 60 * 1000,
   });
 };
 
@@ -129,21 +151,24 @@ export const useDashboard = () => {
   const dashboardPeriod = useUIStore((s) => s.dashboardPeriod);
   const activeAccount = useAccountStore((s) => s.activeAccount);
   const accountId = activeAccount?._id;
-  const cacheKey = `dash_${dashboardPeriod}_${accountId || 'default'}`;
+  const cacheKey = accountId ? `dash_${dashboardPeriod}_${accountId}` : null;
 
   return useQuery<DashboardData>({
     queryKey: statsKeys.dashboard(dashboardPeriod, accountId),
     queryFn: async () => {
+      if (!accountId) return null as any;
       const result = await statsApi.getDashboard(dashboardPeriod, accountId);
-      if (result) {
+      if (result && cacheKey) {
         dashboardCache[cacheKey] = result;
-        AsyncStorage.setItem(`tj_${cacheKey}`, JSON.stringify(result)).catch(() => {});
       }
       return result;
     },
-    initialData: () => dashboardCache[cacheKey],
-    placeholderData: (previousData) => previousData,
-    staleTime: 5 * 60 * 1000,
+    enabled: !!accountId,
+    placeholderData: (previousData) => {
+      if (previousData) return previousData;
+      return cacheKey ? dashboardCache[cacheKey] : undefined;
+    },
+    staleTime: 0,
   });
 };
 
@@ -153,7 +178,7 @@ export const useAnalytics = (startDate?: string, endDate?: string) => {
   return useQuery({
     queryKey: statsKeys.analytics(startDate, endDate, accountId),
     queryFn: () => statsApi.getAnalytics(startDate, endDate, accountId),
-    staleTime: 3 * 60 * 1000,
+    staleTime: 0,
   });
 };
 
@@ -163,7 +188,7 @@ export const useCalendar = (year: number, month: number) => {
   return useQuery({
     queryKey: statsKeys.calendar(year, month, accountId),
     queryFn: () => statsApi.getCalendar(year, month, accountId),
-    staleTime: 2 * 60 * 1000,
+    staleTime: 0,
   });
 };
 
@@ -174,6 +199,7 @@ export const useCalendarDay = (date: string) => {
     queryKey: statsKeys.calendarDay(date, accountId),
     queryFn: () => statsApi.getCalendarDay(date, accountId),
     enabled: !!date,
+    staleTime: 0,
   });
 };
 

@@ -37,20 +37,6 @@ const ThemedApp: React.FC = () => {
 
   useEffect(() => {
     initTheme();
-    AsyncStorage.getAllKeys().then((keys) => {
-      const dashKeys = keys.filter((k) => k.startsWith('tj_dash_'));
-      if (dashKeys.length > 0) {
-        AsyncStorage.multiGet(dashKeys).then((entries) => {
-          entries.forEach(([key, val]) => {
-            if (val) {
-              try {
-                dashboardCache[key.replace('tj_', '')] = JSON.parse(val);
-              } catch {}
-            }
-          });
-        }).catch(() => {});
-      }
-    }).catch(() => {});
   }, []);
 
   return (

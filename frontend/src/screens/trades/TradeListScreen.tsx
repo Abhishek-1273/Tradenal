@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   TextInput, RefreshControl, ScrollView,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -60,6 +60,13 @@ export const TradeListScreen: React.FC = () => {
 
   const { data, isLoading, refetch, isRefetching } = useTrades(filters);
   const { mutate: toggleFavorite } = useToggleFavorite();
+
+  // Auto-refresh trade list when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
 
   const trades = data?.trades ?? [];
   const total = data?.total ?? 0;

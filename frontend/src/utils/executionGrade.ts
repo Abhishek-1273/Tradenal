@@ -18,20 +18,39 @@ export interface ExecutionGradeResult {
 }
 
 export const CORE_RULE_LABELS: Record<string, string> = {
-  plan_followed: 'Followed My Plan',
-  risk_cap: 'Risked Under 1%',
-  sl_immediate: 'Set Stop-Loss at Entry',
-  zero_sl_widening: "Didn't Increase Stop-Loss",
-  one_and_done: 'Only 1 Trade Taken',
-  not_revenge_trade: 'Not a Revenge Trade',
+  // Master Trading Playbook / XAUUSD & Daily Discipline Checks
+  htf_level_15m_1h: '15M / 1H Key Level',
+  allowed_pattern: 'Valid Setup (QML/ISS4/TJL2/DT-DB)',
+  mandatory_confirmation: 'Engulfing / CHOCH Confirmed',
+  risk_cap: 'Max 1% Day Risk Cap',
+  sl_immediate: 'Hard Structural SL Set',
+  zero_sl_widening: 'Never Widened Stop-Loss',
+  killzone_execution: 'London / NY Session Only',
+  news_window_clear: 'No High-Impact News',
+  max_two_trades: 'Max 2 Trades Day Limit',
+  min_rr_feasible: 'Target 1:2+ R:R Feasible',
+  emotionally_grounded: 'Calm Mindset (No Revenge / FOMO)',
+  set_and_forget: 'Set & Forget (No Tampering)',
+  plan_followed: 'Followed Master Playbook',
+  be_at_1_5rr: 'SL to Breakeven at 1:1.5',
+  partial_profit_1_2rr: '40-50% Partials at 1:2',
+  no_mid_trade_scaling: 'No Mid-Trade Scaling',
+  no_hope_trading: 'Cut Chop Without Ego',
+  cooldown_break: '30-45m Break After Loss',
+  not_revenge_trade: 'No Revenge / Aar-Paar Mode',
+  gold_focus: 'Gold Focus (XAUUSD)',
+  zero_noise: 'Zero Trading Noise',
+
+  // Legacy mappings for backward compatibility
+  one_and_done: 'Max 2 Trades Day Limit',
   clean_entry_no_chase: "Didn't Chase Price",
-  news_window_clear: 'Avoided Big News',
-  killzone_execution: 'Traded in Session Time',
-  pre_market_routine: 'Checked Trend First',
-  setup_liquidity_alignment: 'Proper Setup Appeared',
-  min_rr_feasible: 'Target at Least 2x Risk',
+  pre_market_routine: '15M / 1H Key Level',
+  setup_liquidity_alignment: 'Valid Setup (QML/ISS4/TJL2)',
   not_boredom_trade: 'Not a Boredom Trade',
-  emotionally_grounded: 'Calm & Relaxed Mind',
+  candle_close_confirmation: 'Waited for Candle Close',
+  be_shift_per_rules: 'SL to Breakeven at 1:1.5',
+  let_winners_run: 'Booked Partials at 1:2',
+  screen_detached: 'No Mid-Trade Scaling',
 };
 
 /**
@@ -39,12 +58,14 @@ export const CORE_RULE_LABELS: Record<string, string> = {
  * Critical rule breaches that instantly override and assign Grade C
  */
 export const INSTANT_KILL_MISTAKE_MAP: Record<string, string> = {
-  oversized_lot: 'Lot Size Too Big (>1%)',
+  oversized_lot: 'Lot Size Too Big (>1% Day Risk)',
   widened_stop_loss: 'Moved Stop-Loss Backward',
   widened_sl: 'Moved Stop-Loss Backward',
   revenge_trade: 'Revenge Trade (Anger)',
-  broke_one_and_done: 'Overtraded (Took Extra Trade)',
-  naked_entry: 'No Stop-Loss Set',
+  aar_paar_mode: 'Aar-Paar Mode (All-or-Nothing / Double Lot)',
+  broke_trade_limit: 'Overtraded (>2 Trades Limit)',
+  broke_one_and_done: 'Overtraded (>2 Trades Limit)',
+  naked_entry: 'No Structural Stop-Loss Set',
 };
 
 /**
@@ -93,14 +114,21 @@ export function calculateExecutionGrade(
   // ── Priority 1: Instant-Kill Check ──────────────────────────────────────
   const triggeredInstantKill = activeMistakes.find((m) => !!INSTANT_KILL_MISTAKE_MAP[m]);
   const instantKillRuleBreach =
-    !checkedSet.has('risk_cap') || !checkedSet.has('zero_sl_widening');
+    !checkedSet.has('risk_cap') ||
+    !checkedSet.has('zero_sl_widening') ||
+    !checkedSet.has('sl_immediate') ||
+    (!checkedSet.has('max_two_trades') && !checkedSet.has('one_and_done'));
 
   if (triggeredInstantKill || instantKillRuleBreach) {
     const reason = triggeredInstantKill
       ? INSTANT_KILL_MISTAKE_MAP[triggeredInstantKill]
       : !checkedSet.has('risk_cap')
-      ? 'Risk Cap Breached'
-      : 'Stop Loss Widened';
+      ? 'Risk Cap Breached (>1%)'
+      : !checkedSet.has('sl_immediate')
+      ? 'No Structural SL Set'
+      : !checkedSet.has('zero_sl_widening')
+      ? 'Stop Loss Widened'
+      : 'Overtraded (>2 Trades Limit)';
 
     return {
       grade: 'C',

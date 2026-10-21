@@ -71,6 +71,10 @@ export const useAccountStore = create<AccountState>((set, get) => ({
   },
 
   setActiveAccount: async (account: Account) => {
+    try {
+      const { clearDashboardCache } = require('../hooks/useTrades');
+      clearDashboardCache();
+    } catch {}
     set({ activeAccount: account });
     await AsyncStorage.setItem(SELECTED_ACCOUNT_KEY, account._id);
   },
@@ -79,17 +83,19 @@ export const useAccountStore = create<AccountState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const newAccount = await accountsApi.createAccount(payload);
-      // Refresh list
       const accounts = await accountsApi.getAccounts();
-      
-      // If it's the first/only account, or default, set as active
-      let active = get().activeAccount;
-      if (!active || newAccount.isDefault || accounts.length === 1) {
-        active = newAccount;
-        await AsyncStorage.setItem(SELECTED_ACCOUNT_KEY, newAccount._id);
-      }
 
-      set({ accounts, activeAccount: active, isLoading: false });
+      try {
+        const { clearDashboardCache } = require('../hooks/useTrades');
+        clearDashboardCache();
+      } catch {}
+
+      await Promise.all([
+        AsyncStorage.setItem(SELECTED_ACCOUNT_KEY, newAccount._id),
+        AsyncStorage.setItem(CACHED_ACCOUNTS_KEY, JSON.stringify(accounts)),
+      ]);
+
+      set({ accounts, activeAccount: newAccount, isLoading: false });
       return newAccount;
     } catch (err: any) {
       set({ isLoading: false, error: err?.message || 'Failed to create account' });
@@ -159,5 +165,10 @@ export const useAccountStore = create<AccountState>((set, get) => ({
 
   clearAccountState: () => {
     set({ accounts: [], activeAccount: null, isLoading: false, error: null });
+    AsyncStorage.multiRemove([CACHED_ACCOUNTS_KEY, SELECTED_ACCOUNT_KEY]).catch(() => {});
+    try {
+      const { clearDashboardCache } = require('../hooks/useTrades');
+      clearDashboardCache();
+    } catch {}
   },
 }));

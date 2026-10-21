@@ -1,6 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import dayjs from 'dayjs';
@@ -39,8 +39,15 @@ export const CalendarScreen: React.FC = () => {
   const [month, setMonth] = useState(now.month() + 1);
   const [selectedDate, setSelectedDate] = useState(now.format('YYYY-MM-DD'));
 
-  const { data, isLoading } = useCalendar(year, month);
-  const { data: dayData, isLoading: isDayLoading } = useCalendarDay(selectedDate);
+  const { data, isLoading, refetch: refetchCalendar } = useCalendar(year, month);
+  const { data: dayData, isLoading: isDayLoading, refetch: refetchDay } = useCalendarDay(selectedDate);
+
+  useFocusEffect(
+    useCallback(() => {
+      refetchCalendar();
+      refetchDay();
+    }, [refetchCalendar, refetchDay])
+  );
 
   const calendarMap: Record<string, CalendarDay> = {};
   (data?.calendar ?? []).forEach((d) => {
