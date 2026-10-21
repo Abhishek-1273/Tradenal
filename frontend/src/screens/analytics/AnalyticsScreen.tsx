@@ -369,7 +369,7 @@ export const AnalyticsScreen: React.FC = () => {
                 ]}
                 numberOfLines={1}
               >
-                {totalTrades > 0 ? `${netPnL >= 0 ? '+' : ''}${formatPnL(netPnL, currency)}` : '$0.00'}
+                {totalTrades > 0 ? formatPnL(netPnL, currency) : '$0.00'}
               </Text>
               <Text style={[styles.metricSub, { color: colors.textTertiary }]}>
                 {totalTrades} trade{totalTrades === 1 ? '' : 's'} recorded
@@ -620,7 +620,7 @@ export const AnalyticsScreen: React.FC = () => {
 
               {[
                 { label: 'Average Winning Trade', value: formatPnL(avgWin, currency), color: WIN_COLOR, icon: 'arrow-up-circle-outline' },
-                { label: 'Average Losing Trade', value: formatPnL(Math.abs(avgLoss), currency), color: LOSS_COLOR, icon: 'arrow-down-circle-outline' },
+                { label: 'Average Losing Trade', value: formatPnL(-Math.abs(avgLoss), currency), color: LOSS_COLOR, icon: 'arrow-down-circle-outline' },
                 { label: 'Expected Value per Trade', value: expectancy != null ? `${expectancy >= 0 ? '+' : ''}${expectancy.toFixed(2)}R` : '—', color: (expectancy ?? 0) >= 0 ? WIN_COLOR : LOSS_COLOR, icon: 'calculator-outline' },
                 { label: 'Max Winning Streak', value: `${maxWins} Consecutive Wins`, color: WIN_COLOR, icon: 'flame-outline' },
                 { label: 'Max Losing Streak', value: `${maxLosses} Consecutive Losses`, color: LOSS_COLOR, icon: 'shield-outline' },
